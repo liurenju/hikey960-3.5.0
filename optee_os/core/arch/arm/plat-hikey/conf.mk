@@ -8,6 +8,7 @@ $(call force,CFG_PL011,y)
 $(call force,CFG_PM_STUBS,y)
 $(call force,CFG_SECURE_TIME_SOURCE_CNTPCT,y)
 $(call force,CFG_WITH_ARM_TRUSTED_FW,y)
+$(call force,CFG_ENABLE_GPU,y)
 
 ifeq ($(CFG_ARM64_core),y)
 $(call force,CFG_WITH_LPAE,y)
@@ -50,7 +51,7 @@ endif
 
 ifeq ($(PLATFORM_FLAVOR),hikey960)
 CFG_CONSOLE_UART ?= 6
-CFG_DRAM_SIZE_GB ?= 3
+CFG_DRAM_SIZE_GB ?= 4
 CFG_CORE_BGET_BESTFIT ?= y
 CFG_TA_ASLR ?= y
 endif

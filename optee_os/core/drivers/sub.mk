@@ -28,3 +28,4 @@ srcs-$(CFG_STM32_I2C) += stm32_i2c.c
 srcs-$(CFG_BCM_HWRNG) += bcm_hwrng.c
 srcs-$(CFG_BCM_SOTP) += bcm_sotp.c
 srcs-$(CFG_BCM_GPIO) += bcm_gpio.c
+# srcs-$(CFG_ENABLE_GPU) += gpu_drivers/*.c
