@@ -160,7 +160,11 @@ void kbase_reg_write(struct kbase_device *kbdev, u32 offset, u32 value)
 	KBASE_DEBUG_ASSERT(kbdev->pm.backend.gpu_powered);
 	KBASE_DEBUG_ASSERT(kbdev->dev != NULL);
 
+#ifdef CONFIG_SEC_MALI_GPU
+	sec_writel(value, kbdev->reg + offset);
+#else
 	writel(value, kbdev->reg + offset);
+#endif
 
 #ifdef CONFIG_DEBUG_FS
 	if (unlikely(kbdev->io_history.enabled))
@@ -178,7 +182,11 @@ u32 kbase_reg_read(struct kbase_device *kbdev, u32 offset)
 	KBASE_DEBUG_ASSERT(kbdev->pm.backend.gpu_powered);
 	KBASE_DEBUG_ASSERT(kbdev->dev != NULL);
 
+#ifdef CONFIG_SEC_MALI_GPU
+  val = sec_readl(kbdev->reg + offset);
+#else
 	val = readl(kbdev->reg + offset);
+#endif
 
 #ifdef CONFIG_DEBUG_FS
 	if (unlikely(kbdev->io_history.enabled))
