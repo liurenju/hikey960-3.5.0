@@ -70,16 +70,19 @@ u32 sec_kbase_reg_read(u32 __iomem mem)
 }
 
 //securely write to a given register
-void sec_kbase_reg_write(u32 __iomem mem, u32 value)
+u32 sec_kbase_reg_write(u32 __iomem mem, u32 value)
 {
 	if(should_execute_command(mem), WRITE_COMMANDS) {
 		writel(value, mem);
+		return 0;
 	}
 	else {
 		// Needs to modify here, but temporarily put a placeholder here.
 		writel(value, mem);
+		return 0;
 	}
 	DMSG("w: reg %08x val %08x", offset, value);
+	return -1;
 }
 
 // This is the essentail function when a job is done from the GPU,
@@ -305,10 +308,10 @@ static irqreturn_t kbase_mmu_irq_handler(int irq, void *data)
 }
 
 // GPU IRQ secure handler
-static irqreturn_t kbase_gpu_irq_handler(int irq, void *data)
+static irqreturn_t sec_kbase_gpu_irq_handler(int irq, void *data)
 {
 	unsigned long flags;
-	struct kbase_device *kbdev = kbase_untag(data);
+	// struct kbase_device *kbdev = kbase_untag(data);
 	u32 val;
 
 	spin_lock_irqsave(&kbdev->pm.backend.gpu_powered_lock, flags);

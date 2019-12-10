@@ -41,6 +41,9 @@ WARNS ?= 3
 # so assertions are disabled.
 CFG_TEE_CORE_DEBUG ?= y
 
+# Enable Mali GPu
+CFG_TEE_MALI_GPU ?= y
+
 # Log levels for the TEE core. Defines which core messages are displayed
 # on the secure console. Disabling core log (level set to 0) also disables
 # logs from the TAs.
@@ -462,4 +465,3 @@ $(call force,CFG_CORE_RWDATA_NOEXEC,y)
 # Default number of virtual guests
 CFG_VIRT_GUEST_COUNT ?= 2
 endif
-
