@@ -25,6 +25,7 @@
 #include <backend/gpu/mali_kbase_irq_internal.h>
 
 #include <linux/interrupt.h>
+#include <tee_client_api.h>
 
 #if !defined(CONFIG_MALI_NO_MALI)
 

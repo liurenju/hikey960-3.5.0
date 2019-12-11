@@ -3,6 +3,7 @@
 */
 
 #include <drivers/maligpu_registers.h>
+#include <drivers/mali_gpu_data_structure.h>
 // The MACRO definitions
 #define u64_to_user_ptr(x) ((void __user *)(uintptr_t)x)
 
@@ -13,7 +14,12 @@ u32 sec_kbase_reg_write(void __iomem reg, u32 offset, u32 value);
 int sec_kbase_jd_submit(struct kbase_context *kctx,
 		void __user *user_addr, u32 nr_atoms, u32 stride,
 		bool uk6_atom);
+
 irqreturn_t sec_kbase_gpu_irq_handler(int irq, void *data);
+static irqreturn_t sec_kbase_gpu_irq_handler(int irq, void *data);
+static irqreturn_t sec_kbase_mmu_irq_handler(int irq, void *data);
+irqreturn_t sec_irq_handler_base(int irq);
+
 void kbase_jd_done(struct kbase_jd_atom *katom, int slot_nr,
 		ktime_t *end_timestamp, kbasep_js_atom_done_code done_code)
 

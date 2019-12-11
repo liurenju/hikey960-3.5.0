@@ -47,7 +47,7 @@ int should_execute_command(u32 command, int type) {
 	}
 
 	for(; i < sizeof(*green_commands)/sizeof(u32) + 1; i++){
-		if(command == green_commands[i]) {
+		if(*command == green_commands[i]) {
 			return 1;
 		}
 	}
@@ -55,30 +55,30 @@ int should_execute_command(u32 command, int type) {
 }
 
 //securely read from the given register
-u32 sec_kbase_reg_read(u32 __iomem mem)
+u32 sec_kbase_reg_read(u32* __iomem mem, uint32_t command)
 {
 	u32 val;
-	if(should_execute_command(mem), READ_COMMANDS){
-		val = readl(mem);
+	if(should_execute_command(command, READ_COMMANDS){
+		val = (uint32_t *)(mem + command);
 	}
 	else {
 		// Needs to modify here, but temporarily put a placeholder here.
-		val = readl(mem);
+		val = (uint32_t *)(mem + command);
 	}
 	DMSG("r: reg %08x val %08x", mem, val);
 	return val;
 }
 
 //securely write to a given register
-u32 sec_kbase_reg_write(u32 __iomem mem, u32 value)
+u32 sec_kbase_reg_write(u32* __iomem mem, u32 value, uint32_t command)
 {
-	if(should_execute_command(mem), WRITE_COMMANDS) {
-		writel(value, mem);
+	if(should_execute_command(command, WRITE_COMMANDS) {
+		*(mem + command) = value;
 		return 0;
 	}
 	else {
 		// Needs to modify here, but temporarily put a placeholder here.
-		writel(value, mem);
+		*(mem + command) = value;
 		return 0;
 	}
 	DMSG("w: reg %08x val %08x", offset, value);
@@ -123,221 +123,69 @@ void kbase_jd_done(struct kbase_jd_atom *katom, int slot_nr,
 }
 
 // This is the entry from the user space data to communicate with the driver.
-int sec_kbase_jd_submit(struct kbase_context *kctx,
-		void __user *user_addr, u32 nr_atoms, u32 stride,
-		bool uk6_atom)
+int sec_kbase_jd_submit(void __user *user_addr, void *output)
 {
-	struct kbase_jd_context *jctx = &kctx->jctx;
-	int err = 0;
-	int i;
-	bool need_to_try_schedule_context = false;
-	struct kbase_device *kbdev;
-	u32 latest_flush;
-
-	/*
-	 * kbase_jd_submit isn't expected to fail and so all errors with the
-	 * jobs are reported by immediately failing them (through event system)
-	 */
-	kbdev = kctx->kbdev;
-
-	beenthere(kctx, "%s", "Enter");
-
-	if (kbase_ctx_flag(kctx, KCTX_SUBMIT_DISABLED)) {
-		dev_err(kbdev->dev, "Attempt to submit to a context that has SUBMIT_DISABLED set on it");
-		return -EINVAL;
+	struct sec_base_jd_atom_v2* temp = (struct sec_base_jd_atom_v2*) output;
+	if(tee_svc_copy_from_user(temp, user_addr, sizeof(struct sec_base_jd_atom_v2)) != 0) {
+		return -1;
 	}
-
-	if (stride != sizeof(base_jd_atom_v2)) {
-		dev_err(kbdev->dev, "Stride passed to job_submit doesn't match kernel");
-		return -EINVAL;
+	if(!perform_encryption_decryption_data(temp)) {
+		EMSG("Mali: submit jd - Data encryption is wrong.");
+		return -1;
 	}
-
-	/* All atoms submitted in this call have the same flush ID */
-	latest_flush = kbase_backend_get_current_flush_id(kbdev);
-
-	for (i = 0; i < nr_atoms; i++) {
-		struct base_jd_atom_v2 user_atom;
-		struct kbase_jd_atom *katom;
-
-		if (copy_from_user(&user_atom, user_addr,
-					sizeof(user_atom)) != 0) {
-			err = -EINVAL;
-			break;
-		}
-
-		user_addr = (void __user *)((uintptr_t) user_addr + stride);
-
-		mutex_lock(&jctx->lock);
-#ifndef compiletime_assert
-#define compiletime_assert_defined
-#define compiletime_assert(x, msg) do { switch (0) { case 0: case (x):; } } \
-while (false)
-#endif
-		compiletime_assert((1 << (8*sizeof(user_atom.atom_number))) ==
-					BASE_JD_ATOM_COUNT,
-			"BASE_JD_ATOM_COUNT and base_atom_id type out of sync");
-		compiletime_assert(sizeof(user_atom.pre_dep[0].atom_id) ==
-					sizeof(user_atom.atom_number),
-			"BASE_JD_ATOM_COUNT and base_atom_id type out of sync");
-#ifdef compiletime_assert_defined
-#undef compiletime_assert
-#undef compiletime_assert_defined
-#endif
-		katom = &jctx->atoms[user_atom.atom_number];
-
-		/* Record the flush ID for the cache flush optimisation */
-		katom->flush_id = latest_flush;
-
-		while (katom->status != KBASE_JD_ATOM_STATE_UNUSED) {
-			/* Atom number is already in use, wait for the atom to
-			 * complete
-			 */
-			mutex_unlock(&jctx->lock);
-
-			kbase_js_sched_all(kbdev);
-
-			if (wait_event_killable(katom->completed,
-					katom->status ==
-					KBASE_JD_ATOM_STATE_UNUSED) != 0) {
-				/* We're being killed so the result code
-				 * doesn't really matter
-				 */
-				return 0;
-			}
-			mutex_lock(&jctx->lock);
-		}
-
-		need_to_try_schedule_context |=
-				       jd_submit_atom(kctx, &user_atom, katom);
-
-		/* Register a completed job as a disjoint event when the GPU is in a disjoint state
-		 * (ie. being reset or replaying jobs).
-		 */
-		kbase_disjoint_event_potential(kbdev);
-
-		mutex_unlock(&jctx->lock);
-	}
-
-	if (need_to_try_schedule_context)
-		kbase_js_sched_all(kbdev);
-
-	return err;
+	return 0;
 }
 
-u32 perform_encryption_decryption_data(u32 data) {
+int perform_encryption_decryption_data(struct sec_base_jd_atom_v2* data) {
 	// Perform the proposed mechanisms to encrypt and decrypt the data.
 
 	//TODO: We will add the details later in the driver.
-	return data;
+	data->udata = data->udata;
+	return 0;
 }
 
 // JOB IRQ secure handler
-static irqreturn_t kbase_job_irq_handler(int irq, void *data)
+static irqreturn_t sec_kbase_job_irq_handler(int irq, void *data)
 {
-	unsigned long flags;
-	struct kbase_device *kbdev = kbase_untag(data);
-	u32 val;
-
-	spin_lock_irqsave(&kbdev->pm.backend.gpu_powered_lock, flags);
-
-	if (!kbdev->pm.backend.gpu_powered) {
-		/* GPU is turned off - IRQ is not for us */
-		spin_unlock_irqrestore(&kbdev->pm.backend.gpu_powered_lock,
-									flags);
-		return IRQ_NONE;
-	}
-
-	val = kbase_reg_read(kbdev, JOB_CONTROL_REG(JOB_IRQ_STATUS));
-
-#ifdef CONFIG_MALI_DEBUG
-	if (!kbdev->pm.backend.driver_ready_for_irqs)
-		dev_warn(kbdev->dev, "%s: irq %d irqstatus 0x%x before driver is ready\n",
-				__func__, irq, val);
-#endif /* CONFIG_MALI_DEBUG */
-	spin_unlock_irqrestore(&kbdev->pm.backend.gpu_powered_lock, flags);
-
+	uint32_t val = sec_kbase_reg_read(data, JOB_CONTROL_REG(JOB_IRQ_STATUS));
 	if (!val)
 		return IRQ_NONE;
-
-	dev_dbg(kbdev->dev, "%s: irq %d irqstatus 0x%x\n", __func__, irq, val);
-
-	kbase_job_done(kbdev, val);
-
 	return IRQ_HANDLED;
 }
 
 // MMU IRQ secure handler
-static irqreturn_t kbase_mmu_irq_handler(int irq, void *data)
+static irqreturn_t sec_kbase_mmu_irq_handler(int irq, void *data)
 {
-	unsigned long flags;
-	struct kbase_device *kbdev = kbase_untag(data);
-	u32 val;
-
-	spin_lock_irqsave(&kbdev->pm.backend.gpu_powered_lock, flags);
-
-	if (!kbdev->pm.backend.gpu_powered) {
-		/* GPU is turned off - IRQ is not for us */
-		spin_unlock_irqrestore(&kbdev->pm.backend.gpu_powered_lock,
-									flags);
+	uint32_t val = kbase_reg_read(kbdev, MMU_REG(MMU_IRQ_STATUS));
+	if (!val)
 		return IRQ_NONE;
-	}
-
-	atomic_inc(&kbdev->faults_pending);
-
-	val = kbase_reg_read(kbdev, MMU_REG(MMU_IRQ_STATUS));
-
-#ifdef CONFIG_MALI_DEBUG
-	if (!kbdev->pm.backend.driver_ready_for_irqs)
-		dev_warn(kbdev->dev, "%s: irq %d irqstatus 0x%x before driver is ready\n",
-				__func__, irq, val);
-#endif /* CONFIG_MALI_DEBUG */
-	spin_unlock_irqrestore(&kbdev->pm.backend.gpu_powered_lock, flags);
-
-	if (!val) {
-		atomic_dec(&kbdev->faults_pending);
-		return IRQ_NONE;
-	}
-
-	dev_dbg(kbdev->dev, "%s: irq %d irqstatus 0x%x\n", __func__, irq, val);
-
-	kbase_mmu_interrupt(kbdev, val);
-
-	atomic_dec(&kbdev->faults_pending);
-
 	return IRQ_HANDLED;
 }
 
 // GPU IRQ secure handler
 static irqreturn_t sec_kbase_gpu_irq_handler(int irq, void *data)
 {
-	unsigned long flags;
-	// struct kbase_device *kbdev = kbase_untag(data);
-	u32 val;
-
-	spin_lock_irqsave(&kbdev->pm.backend.gpu_powered_lock, flags);
-
-	if (!kbdev->pm.backend.gpu_powered) {
-		/* GPU is turned off - IRQ is not for us */
-		spin_unlock_irqrestore(&kbdev->pm.backend.gpu_powered_lock,
-									flags);
-		return IRQ_NONE;
-	}
-
-	val = kbase_reg_read(kbdev, GPU_CONTROL_REG(GPU_IRQ_STATUS));
-
-#ifdef CONFIG_MALI_DEBUG
-	if (!kbdev->pm.backend.driver_ready_for_irqs)
-		dev_dbg(kbdev->dev, "%s: irq %d irqstatus 0x%x before driver is ready\n",
-				__func__, irq, val);
-#endif /* CONFIG_MALI_DEBUG */
-	spin_unlock_irqrestore(&kbdev->pm.backend.gpu_powered_lock, flags);
+	uint32_t val = kbase_reg_read(kbdev, GPU_CONTROL_REG(GPU_IRQ_STATUS));
 
 	if (!val)
 		return IRQ_NONE;
-
-	dev_dbg(kbdev->dev, "%s: irq %d irqstatus 0x%x\n", __func__, irq, val);
-
-	kbase_gpu_interrupt(kbdev, val);
-
 	return IRQ_HANDLED;
+}
+
+// Interrupt handler simply forwards the interrupts to normal world
+// for handling checking.
+irqreturn_t sec_irq_handler_base(int irq) {
+	DMSG("Calling into irq handler.");
+	switch (irq) {
+		case JOB_IRQ_TAG:
+			return sec_kbase_job_irq_handler(irq);
+		case MMU_IRQ_TAG:
+			return sec_kbase_mmu_irq_handler(irq);
+		case GPU_IRQ_TAG:
+			return sec_kbase_gpu_irq_handler(irq);
+		default:
+			EMSG("Unexpected IRQ signal.");
+			break;
+	}
+	return IRQ_NONE;
 }

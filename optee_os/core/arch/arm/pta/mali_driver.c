@@ -73,10 +73,40 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
     return TEE_SUCCESS;
 
   case JD_SUBMIT:
+		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+								 TEE_PARAM_TYPE_MEMREF_OUTPUT,
+								 TEE_PARAM_TYPE_NONE,
+								 TEE_PARAM_TYPE_NONE);
+
+		if (param_types != exp_param_types) {
+			EMSG("Mali driver: unexpected jd submit param type.");
+			return TEE_ERROR_BAD_PARAMETERS;
+		}
+
+		uint32_t return_value = sec_kbase_jd_submit(params[0].memref.buffer, params[1].memref.buffer);
+		if (return_value != TEE_SUCCESS){
+			EMSG("Mali driver: jd failed to submit")
+      return TEE_ERROR_BAD_STATE;
+		}
     return TEE_SUCCESS;
 
   case IRQ_HANDLING:
-    kbase_job_irq_handler
+		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+								 TEE_PARAM_TYPE_NONE,
+								 TEE_PARAM_TYPE_NONE,
+								 TEE_PARAM_TYPE_NONE);
+
+		if (param_types != exp_param_types) {
+      EMSG("Mali driver: unexpected interrupt handler param type.");
+      return TEE_ERROR_BAD_PARAMETERS;
+    }
+
+		uint32_t irq_signal = (uint32_t)params[0].value.a;
+		irqreturn return_status = sec_irq_handler_base(irq_signal);
+		if (return_status == IRQ_NONE) {
+			EMSG("Mali driver: handling IRQ signal error.");
+			return TEE_ERROR_BAD_STATE;
+		}
     return TEE_SUCCESS;
 	default:
 		break;
