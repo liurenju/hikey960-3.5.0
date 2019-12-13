@@ -1,7 +1,7 @@
 #define TA_NAME		"mali_driver.ta"
 
 //62a0838c-1aeb-11ea-978f-2e728ce88125
-#define STATS_UUID \
+#define MALI_UUID \
 		{ 0x62a0838c, 0x1aeb, 0x11ea, \
 			{ 0x97, 0x8f, 0x2e, 0x72, 0x8c, 0xe8, 0x81, 0x25 } }
 

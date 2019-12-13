@@ -38,6 +38,7 @@
 #include <mali_kbase_tlstream.h>
 
 #include "mali_kbase_dma_fence.h"
+#include <tee_client_api.h>
 
 #define beenthere(kctx, f, a...)  dev_dbg(kctx->kbdev->dev, "%s:" f, __func__, ##a)
 
@@ -1096,6 +1097,47 @@ bool jd_submit_atom(struct kbase_context *kctx, const struct base_jd_atom_v2 *us
 	return ret;
 }
 
+int sec_kbase_jd_submit() {
+	TEEC_Result res;
+	TEEC_Context ctx;
+	TEEC_Session sess;
+	TEEC_Operation op;
+	TEEC_UUID uuid = MALI_SEC_UUID;
+	uint32_t err_origin;
+
+	res = TEEC_InitializeContext(NULL, &ctx);
+	if (res != TEEC_SUCCESS)
+	{
+		errx(1, "TEEC_InitializeContext failed with code 0x%x", res);
+
+	}
+	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+						 TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS)
+	{
+		errx(1, "TEEC_Opensession failed with code 0x%x origin 0x%x",
+			res, err_origin);
+	}
+	memset(&op, 0, sizeof(op));
+
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_INPUT, TEEC_MEMREF_OUTPUT,
+		TEEC_NONE, TEEC_NONE);
+
+
+	res = TEEC_InvokeCommand(&sess, command, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS){
+		errx(1, "TEEC_InvokeCommand failed with code 0x%x origin 0x%x",
+			res, err_origin);
+		return 0;
+	}
+
+	TEEC_CloseSession(&sess);
+	TEEC_FinalizeContext(&ctx);
+
+	return (u32)op.params[1].value.b;
+}
+
 int kbase_jd_submit(struct kbase_context *kctx,
 		void __user *user_addr, u32 nr_atoms, u32 stride,
 		bool uk6_atom)
@@ -1127,16 +1169,55 @@ int kbase_jd_submit(struct kbase_context *kctx,
 
 	/* All atoms submitted in this call have the same flush ID */
 	latest_flush = kbase_backend_get_current_flush_id(kbdev);
+#ifdef CONFIG_SEC_MALI_GPU
+	TEEC_Result res;
+	TEEC_Context ctx;
+	TEEC_Session sess;
+	TEEC_Operation op;
+	TEEC_UUID uuid = MALI_SEC_UUID;
+	uint32_t err_origin;
+
+	res = TEEC_InitializeContext(NULL, &ctx);
+	if (res != TEEC_SUCCESS)
+	{
+		errx(1, "TEEC_InitializeContext failed with code 0x%x", res);
+
+	}
+	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+						 TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS)
+	{
+		errx(1, "TEEC_Opensession failed with code 0x%x origin 0x%x",
+			res, err_origin);
+	}
+	memset(&op, 0, sizeof(op));
+
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_INPUT, TEEC_MEMREF_OUTPUT,
+		TEEC_NONE, TEEC_NONE);
+#endif
 
 	for (i = 0; i < nr_atoms; i++) {
 		struct base_jd_atom_v2 user_atom;
 		struct kbase_jd_atom *katom;
 
+#ifdef CONFIG_SEC_MALI_GPU
+	op.params[0].memref.buffer = user_addr;
+	op.params[1].memref.buffer = &user_atom;
+	res = TEEC_InvokeCommand(&sess, command, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS){
+		errx(1, "TEEC_InvokeCommand failed with code 0x%x origin 0x%x",
+			res, err_origin);
+		err = -EINVAL;
+		break;
+	}
+#else
 		if (copy_from_user(&user_atom, user_addr,
 					sizeof(user_atom)) != 0) {
 			err = -EINVAL;
 			break;
 		}
+#endif
 
 		user_addr = (void __user *)((uintptr_t) user_addr + stride);
 
@@ -1197,6 +1278,11 @@ while (false)
 
 		mutex_unlock(&jctx->lock);
 	}
+
+#ifdef CONFIG_SEC_MALI_GPU
+	TEEC_CloseSession(&sess);
+	TEEC_FinalizeContext(&ctx);
+#endif
 
 	if (need_to_try_schedule_context)
 		kbase_js_sched_all(kbdev);

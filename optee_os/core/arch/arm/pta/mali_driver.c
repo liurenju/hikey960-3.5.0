@@ -34,10 +34,11 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 {
   DMSG("Mali driver invoke command called.");
 	switch (cmd_id) {
+
 	case READ_COMMANDS:
-    uint32_t mem_address = (uint32_t)params[0].value.a;
-    uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INOUT,
-  						   TEE_PARAM_TYPE_NONE,
+    uint32_t* mem_address = (uint32_t*)params[0].memref.buffer;
+    uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+  						   TEE_PARAM_TYPE_VALUE_INOUT,
   						   TEE_PARAM_TYPE_NONE,
   						   TEE_PARAM_TYPE_NONE);
 
@@ -45,17 +46,20 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
       EMSG("Mali driver: unexpected read param type.");
       return TEE_ERROR_BAD_PARAMETERS;
     }
-
+		uint32_t offset = (uint32_t)params[1].value.a;
     uint32_t returned_value = sec_kbase_reg_read(mem_address);
     if (returned_value == 0xdeadbeef) {
-
+			EMSG("Mali driver: failed to read.");
+			return TEE_ERROR_BAD_STATE;
     }
-    params[0].value.b = returned_value;
+    params[1].value.b = returned_value;
 		return TEE_SUCCESS;
-  case WRITE_COMMANDS:
-    uint32_t mem_address = (uint32_t)params[0].value.a;
-    uint32_t value = (uint32_t) params[1].value.a;
-    uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+
+	case WRITE_COMMANDS:
+    uint32_t* mem_address = (uint32_t*)params[0].memref.buffer;
+		uint32_t offset = (uint32_t) params[1].value.a
+    uint32_t value = (uint32_t) params[1].value.b;
+    uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
   						   TEE_PARAM_TYPE_INPUT,
   						   TEE_PARAM_TYPE_NONE,
   						   TEE_PARAM_TYPE_NONE);
@@ -65,7 +69,7 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
       return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    uint32_t return_value = sec_kbase_reg_write(mem_address, value);
+    uint32_t return_value = sec_kbase_reg_write(mem_address, value, offset);
     if(return_value != TEE_SUCCESS) {
       EMSG("Mali driver: memory address not permissible to write.")
       return TEE_ERROR_BAD_STATE;
@@ -91,8 +95,8 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
     return TEE_SUCCESS;
 
   case IRQ_HANDLING:
-		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
-								 TEE_PARAM_TYPE_NONE,
+		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INOUT,
+								 TEE_PARAM_TYPE_MEMREF_INPUT,
 								 TEE_PARAM_TYPE_NONE,
 								 TEE_PARAM_TYPE_NONE);
 
@@ -102,7 +106,8 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
     }
 
 		uint32_t irq_signal = (uint32_t)params[0].value.a;
-		irqreturn return_status = sec_irq_handler_base(irq_signal);
+		uint32_t out = (uint32_t)params[0].value.b;
+		irqreturn return_status = sec_irq_handler_base(irq_signal, params[1].memref.buffer, &out);
 		if (return_status == IRQ_NONE) {
 			EMSG("Mali driver: handling IRQ signal error.");
 			return TEE_ERROR_BAD_STATE;

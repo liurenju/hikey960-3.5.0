@@ -30,6 +30,10 @@
 
 #include <backend/gpu/mali_kbase_device_internal.h>
 #include <mali_kbase_config_defaults.h>
+#include <tee_client_api.h>
+
+#define READ_COMMANDS   1
+#define WRITE_COMMANDS  2
 
 #if !defined(CONFIG_MALI_NO_MALI)
 
@@ -154,6 +158,74 @@ void kbase_io_history_dump(struct kbase_device *kbdev)
 
 #endif /* CONFIG_DEBUG_FS */
 
+//TEE supported readl
+u32 sec_readl(void* __iomem mem_address, u32 offset) {
+	return call_into_tz(READ_COMMANDS, (u32*)mem_address, offset);
+}
+
+//TEE supported writel
+void sec_writel(u32 value, void* mem_address, u32 offset) {
+	call_into_tz(WRITE_COMMANDS, (u32*)mem_address, offset, value);
+}
+
+u32 call_into_tz(u32 type, u32* mem_address, u32 offset, u32 value) {
+	TEEC_Result res;
+	TEEC_Context ctx;
+	TEEC_Session sess;
+	TEEC_Operation op;
+	TEEC_UUID uuid = MALI_SEC_UUID;
+	uint32_t err_origin;
+	u32 command = type;
+
+	res = TEEC_InitializeContext(NULL, &ctx);
+	if (res != TEEC_SUCCESS)
+	{
+		errx(1, "TEEC_InitializeContext failed with code 0x%x", res);
+
+	}
+	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+						 TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS)
+	{
+		errx(1, "TEEC_Opensession failed with code 0x%x origin 0x%x",
+			res, err_origin);
+	}
+	memset(&op, 0, sizeof(op));
+
+	switch (type) {
+		case READ_COMMANDS:
+			op.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_INPUT,
+				TEEC_VALUE_INOUT,
+				TEEC_NONE, TEEC_NONE);
+			op.params[0].memref.buffer = mem_address;
+			op.params[0].memref.size = sizeof(u32);
+			op.params[1].value.a = offset;
+			break;
+		case WRITE_COMMANDS:
+			op.paramTypes = TEEC_PARAM_TYPES(TEEC_MEMREF_INPUT, TEEC_VALUE_INPUT,
+				TEEC_NONE, TEEC_NONE);
+			op.params[0].memref.buffer = mem_address;
+			op.params[1].value.a = offset;
+			op.params[1].value.b = value;
+		break;
+		default:
+			errx(1, "Mali driver user space: Unknown type.");
+			return -1;
+	}
+
+	res = TEEC_InvokeCommand(&sess, command, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS){
+		errx(1, "TEEC_InvokeCommand failed with code 0x%x origin 0x%x",
+			res, err_origin);
+		return 0;
+	}
+
+	TEEC_CloseSession(&sess);
+	TEEC_FinalizeContext(&ctx);
+
+	return (u32)op.params[1].value.b;
+}
 
 void kbase_reg_write(struct kbase_device *kbdev, u32 offset, u32 value)
 {
@@ -161,7 +233,7 @@ void kbase_reg_write(struct kbase_device *kbdev, u32 offset, u32 value)
 	KBASE_DEBUG_ASSERT(kbdev->dev != NULL);
 
 #ifdef CONFIG_SEC_MALI_GPU
-	sec_writel(value, kbdev->reg + offset);
+	sec_writel(value, kbdev->reg, offset);
 #else
 	writel(value, kbdev->reg + offset);
 #endif
@@ -183,7 +255,7 @@ u32 kbase_reg_read(struct kbase_device *kbdev, u32 offset)
 	KBASE_DEBUG_ASSERT(kbdev->dev != NULL);
 
 #ifdef CONFIG_SEC_MALI_GPU
-  val = sec_readl(kbdev->reg + offset);
+  val = sec_readl(kbdev->reg, offset);
 #else
 	val = readl(kbdev->reg + offset);
 #endif
