@@ -7,6 +7,8 @@
 #include <util.h>
 #include <io.h>
 #include <trace.h>
+#include <string.h>
+#include <tee/tee_svc.h>
 
 // This driver mainly protects the device interrupts and the memory-mapped IO
 // for the GPU. Most of them should not be directly forwarded for non-secure
@@ -15,7 +17,7 @@
 /*
 	Allowable GPU access
 */
-u32* write_green_commands = {
+u32 write_green_commands[] = {
 	MMU_REG(MMU_IRQ_MASK),
 	MMU_REG(MMU_IRQ_CLEAR),
 	GPU_CONTROL_REG(GPU_IRQ_MASK),
@@ -23,7 +25,7 @@ u32* write_green_commands = {
 	GPU_CONTROL_REG(GPU_IRQ_CLEAR),
 };
 
-u32* read_green_commands = {
+u32 read_green_commands[] = {
 	MMU_REG(MMU_IRQ_MASK),
 	MMU_REG(MMU_IRQ_CLEAR),
 	GPU_CONTROL_REG(GPU_IRQ_MASK),
@@ -46,8 +48,8 @@ int should_execute_command(u32 command, int type) {
 			return 0;
 	}
 
-	for(; i < sizeof(*green_commands)/sizeof(u32) + 1; i++){
-		if(*command == green_commands[i]) {
+	for(; i < 5; i++){
+		if(command == green_commands[i]) {
 			return 1;
 		}
 	}
@@ -55,24 +57,31 @@ int should_execute_command(u32 command, int type) {
 }
 
 //securely read from the given register
-u32 sec_kbase_reg_read(u32* __iomem mem, uint32_t command)
+u32 sec_kbase_reg_read(u32* mem, uint32_t command)
 {
 	u32 val;
-	if(should_execute_command(command, READ_COMMANDS){
-		val = (uint32_t *)(mem);
+	if (should_execute_command(command, READ_COMMANDS))
+	{
+		val = *(mem + command);
 	}
 	else {
 		// Needs to modify here, but temporarily put a placeholder here.
-		val = (uint32_t *)(mem + command);
+		val = *(mem + command);
 	}
-	DMSG("r: reg %08x val %08x", mem, val);
+	DMSG("r: reg %08x val %08x", command, val);
 	return val;
 }
 
+u8 perform_encryption_decryption_data(u8 data, char* key __unused){
+	//Renju Liu: TODO: Implement aes here.
+	return data;
+}
+
 //securely write to a given register
-u32 sec_kbase_reg_write(u32* __iomem mem, u32 value, uint32_t command)
+u32 sec_kbase_reg_write(u32* mem, u32 value, uint32_t command)
 {
-	if(should_execute_command(command, WRITE_COMMANDS) {
+	if(should_execute_command(command, WRITE_COMMANDS))
+	{
 		*(mem + command) = value;
 		return 0;
 	}
@@ -81,12 +90,12 @@ u32 sec_kbase_reg_write(u32* __iomem mem, u32 value, uint32_t command)
 		*(mem + command) = value;
 		return 0;
 	}
-	DMSG("w: reg %08x val %08x", offset, value);
+	DMSG("w: reg %08x val %08x", command, value);
 	return -1;
 }
 
 // This is the entry from the user space data to communicate with the driver.
-int sec_kbase_jd_submit(void __user *user_addr, void *output)
+int sec_kbase_jd_submit(void *user_addr, void *output)
 {
 	struct sec_base_jd_atom_v2* temp = (struct sec_base_jd_atom_v2*) output;
 	if(tee_svc_copy_from_user(temp, user_addr, sizeof(struct sec_base_jd_atom_v2)) != 0) {
@@ -96,7 +105,7 @@ int sec_kbase_jd_submit(void __user *user_addr, void *output)
 }
 
 // JOB IRQ secure handler
-static irqreturn_t sec_kbase_job_irq_handler(int irq, void *data, uint32_t *out)
+irqreturn_t sec_kbase_job_irq_handler(int irq __unused, void *data, uint32_t *out)
 {
 	uint32_t val = sec_kbase_reg_read(data, JOB_CONTROL_REG(JOB_IRQ_STATUS));
 
@@ -109,7 +118,7 @@ static irqreturn_t sec_kbase_job_irq_handler(int irq, void *data, uint32_t *out)
 }
 
 // MMU IRQ secure handler
-static irqreturn_t sec_kbase_mmu_irq_handler(int irq, void *data, uint32_t* out)
+irqreturn_t sec_kbase_mmu_irq_handler(int irq __unused, void *data, uint32_t* out)
 {
 	uint32_t val = sec_kbase_reg_read(data, MMU_REG(MMU_IRQ_STATUS));
 
@@ -122,7 +131,7 @@ static irqreturn_t sec_kbase_mmu_irq_handler(int irq, void *data, uint32_t* out)
 }
 
 // GPU IRQ secure handler
-static irqreturn_t sec_kbase_gpu_irq_handler(int irq, void *data, uint32_t* out)
+irqreturn_t sec_kbase_gpu_irq_handler(int irq __unused, void *data, uint32_t* out)
 {
 	uint32_t val = sec_kbase_reg_read(data, GPU_CONTROL_REG(GPU_IRQ_STATUS));
 

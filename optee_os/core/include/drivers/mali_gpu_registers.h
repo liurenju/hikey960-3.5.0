@@ -15,6 +15,11 @@
 #define MMU_IRQ_TAG	1
 #define GPU_IRQ_TAG	2
 
+typedef uint64_t u64;
+typedef uint32_t u32;
+typedef uint16_t u16;
+typedef uint8_t u8;
+
 /**
  * enum irqreturn
  * @IRQ_NONE		interrupt was not from this device or was not handled

@@ -36,6 +36,7 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 	switch (cmd_id) {
 
 	case READ_COMMANDS:
+	{
     uint32_t* mem_address = (uint32_t*)params[0].memref.buffer;
     uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
   						   TEE_PARAM_TYPE_VALUE_INOUT,
@@ -47,20 +48,21 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
       return TEE_ERROR_BAD_PARAMETERS;
     }
 		uint32_t offset = (uint32_t)params[1].value.a;
-    uint32_t returned_value = sec_kbase_reg_read(mem_address);
+    uint32_t returned_value = sec_kbase_reg_read(mem_address, offset);
     if (returned_value == 0xdeadbeef) {
 			EMSG("Mali driver: failed to read.");
 			return TEE_ERROR_BAD_STATE;
     }
     params[1].value.b = returned_value;
 		return TEE_SUCCESS;
-
+	}
 	case WRITE_COMMANDS:
+	{
     uint32_t* mem_address = (uint32_t*)params[0].memref.buffer;
-		uint32_t offset = (uint32_t) params[1].value.a
+		uint32_t offset = (uint32_t) params[1].value.a;
     uint32_t value = (uint32_t) params[1].value.b;
     uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
-  						   TEE_PARAM_TYPE_INPUT,
+  						   TEE_PARAM_TYPE_VALUE_INPUT,
   						   TEE_PARAM_TYPE_NONE,
   						   TEE_PARAM_TYPE_NONE);
 
@@ -71,12 +73,13 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 
     uint32_t return_value = sec_kbase_reg_write(mem_address, value, offset);
     if(return_value != TEE_SUCCESS) {
-      EMSG("Mali driver: memory address not permissible to write.")
+      EMSG("Mali driver: memory address not permissible to write.");
       return TEE_ERROR_BAD_STATE;
     }
     return TEE_SUCCESS;
-
+	}
   case JD_SUBMIT:
+	{
 		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 								 TEE_PARAM_TYPE_MEMREF_OUTPUT,
 								 TEE_PARAM_TYPE_NONE,
@@ -89,12 +92,14 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 
 		uint32_t return_value = sec_kbase_jd_submit(params[0].memref.buffer, params[1].memref.buffer);
 		if (return_value != TEE_SUCCESS){
-			EMSG("Mali driver: jd failed to submit")
+			EMSG("Mali driver: jd failed to submit");
       return TEE_ERROR_BAD_STATE;
 		}
     return TEE_SUCCESS;
+	}
 
   case IRQ_HANDLING:
+	{
 		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INOUT,
 								 TEE_PARAM_TYPE_MEMREF_INPUT,
 								 TEE_PARAM_TYPE_NONE,
@@ -107,12 +112,13 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 
 		uint32_t irq_signal = (uint32_t)params[0].value.a;
 		uint32_t out = (uint32_t)params[0].value.b;
-		irqreturn return_status = sec_irq_handler_base(irq_signal, params[1].memref.buffer, &out);
+		irqreturn_t return_status = sec_irq_handler_base(irq_signal, params[1].memref.buffer, &out);
 		if (return_status == IRQ_NONE) {
 			EMSG("Mali driver: handling IRQ signal error.");
 			return TEE_ERROR_BAD_STATE;
 		}
     return TEE_SUCCESS;
+	}
 	default:
 		break;
 	}

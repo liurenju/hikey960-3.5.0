@@ -25,6 +25,9 @@ KDIR ?= /lib/modules/$(shell uname -r)/build
 BUSLOG_PATH_RELATIVE = $(CURDIR)/../../../..
 KBASE_PATH_RELATIVE = $(CURDIR)
 
+TEE_LIBS = -lteec
+TEE_INCLUDE = -I/home/liurenju/Desktop/research/optee-hikey960-3.5.0/optee_client/public
+
 ifeq ($(CONFIG_MALI_FPGA_BUS_LOGGER),y)
 #Add bus logger symbols
 EXTRA_SYMBOLS += $(BUSLOG_PATH_RELATIVE)/drivers/base/bus_logger/Module.symvers
@@ -32,7 +35,7 @@ endif
 
 # we get the symbols from modules using KBUILD_EXTRA_SYMBOLS to prevent warnings about unknown functions
 all:
-	$(MAKE) -C $(KDIR) M=$(CURDIR) EXTRA_CFLAGS="-I$(CURDIR)/../../../../include -I$(CURDIR)/../../../../tests/include $(SCONS_CFLAGS)" $(SCONS_CONFIGS) KBUILD_EXTRA_SYMBOLS="$(EXTRA_SYMBOLS)" modules
+	$(MAKE) -C $(KDIR) M=$(CURDIR) $(TEE_LIBS) $(TEE_INCLUDE) EXTRA_CFLAGS="-I$(CURDIR)/../../../../include -I$(CURDIR)/../../../../tests/include $(SCONS_CFLAGS)" $(SCONS_CONFIGS) KBUILD_EXTRA_SYMBOLS="$(EXTRA_SYMBOLS)" modules
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(CURDIR) clean

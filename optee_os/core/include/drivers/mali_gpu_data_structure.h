@@ -3,15 +3,14 @@ typedef struct base_jd_udata {
 } base_jd_udata;
 
 typedef u8 base_atom_id; /**< Type big enough to store an atom number in */
+typedef u8 base_jd_dep_type;
+typedef u8 base_jd_prio;
+typedef u32 base_jd_core_req;
 
 struct base_dependency {
 	base_atom_id  atom_id;               /**< An atom number */
 	base_jd_dep_type dependency_type;    /**< Dependency type */
 };
-
-typedef u8 base_jd_dep_type;
-typedef u8 base_jd_prio;
-typedef u32 base_jd_core_req;
 
 typedef struct sec_base_jd_atom_v2 {
 	u64 jc;			    /**< job-chain GPU address */
