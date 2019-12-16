@@ -4,7 +4,7 @@ DEVICE=$1
 IMG_FOLDER=${PWD}
 
 if [ "${DEVICE}" == "" ]; then
-	DEVICE=/dev/ttyUSB1
+	DEVICE=/dev/ttyUSB0
 fi
 
 sudo ./hikey_idt -c config -p ${DEVICE}

@@ -25,7 +25,7 @@
 #include <backend/gpu/mali_kbase_irq_internal.h>
 
 #include <linux/interrupt.h>
-#include <tee_client_api.h>
+// #include <tee_client_api.h>
 
 #if !defined(CONFIG_MALI_NO_MALI)
 
@@ -56,48 +56,48 @@ static void *kbase_untag(void *ptr)
 	return (void *)(((uintptr_t) ptr) & ~3);
 }
 
-static u32 kbase_request_secure_handler(int irq, void *data) {
-	TEEC_Result res;
-	TEEC_Context ctx;
-	TEEC_Session sess;
-	TEEC_Operation op;
-	TEEC_UUID uuid = MALI_SEC_UUID;
-	uint32_t err_origin;
-
-	res = TEEC_InitializeContext(NULL, &ctx);
-	if (res != TEEC_SUCCESS)
-	{
-		errx(1, "TEEC_InitializeContext failed with code 0x%x", res);
-
-	}
-	res = TEEC_OpenSession(&ctx, &sess, &uuid,
-						 TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
-	if (res != TEEC_SUCCESS)
-	{
-		errx(1, "TEEC_Opensession failed with code 0x%x origin 0x%x",
-			res, err_origin);
-	}
-	memset(&op, 0, sizeof(op));
-
-	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INOUT, TEEC_MEMREF_INPUT,
-					 TEEC_NONE, TEEC_NONE);
-	op.params[0].value.a = irq;
-	op.params[0].value.b = NULL;
-	op.params[1].memref.buffer = data;
-
-	res = TEEC_InvokeCommand(&sess, IRQ_REQUESTS, &op,
-				 &err_origin);
-	if (res != TEEC_SUCCESS){
-		errx(1, "TEEC_InvokeCommand failed with code 0x%x origin 0x%x",
-			res, err_origin);
-		return 0;
-	}
-
-	TEEC_CloseSession(&sess);
-	TEEC_FinalizeContext(&ctx);
-
-	return (u32)op.params[0].value.b;
-}
+// static u32 kbase_request_secure_handler(int irq, void *data) {
+// 	TEEC_Result res;
+// 	TEEC_Context ctx;
+// 	TEEC_Session sess;
+// 	TEEC_Operation op;
+// 	TEEC_UUID uuid = MALI_SEC_UUID;
+// 	uint32_t err_origin;
+//
+// 	res = TEEC_InitializeContext(NULL, &ctx);
+// 	if (res != TEEC_SUCCESS)
+// 	{
+// 		errx(1, "TEEC_InitializeContext failed with code 0x%x", res);
+//
+// 	}
+// 	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+// 						 TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+// 	if (res != TEEC_SUCCESS)
+// 	{
+// 		errx(1, "TEEC_Opensession failed with code 0x%x origin 0x%x",
+// 			res, err_origin);
+// 	}
+// 	memset(&op, 0, sizeof(op));
+//
+// 	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INOUT, TEEC_MEMREF_INPUT,
+// 					 TEEC_NONE, TEEC_NONE);
+// 	op.params[0].value.a = irq;
+// 	op.params[0].value.b = NULL;
+// 	op.params[1].memref.buffer = data;
+//
+// 	res = TEEC_InvokeCommand(&sess, IRQ_REQUESTS, &op,
+// 				 &err_origin);
+// 	if (res != TEEC_SUCCESS){
+// 		errx(1, "TEEC_InvokeCommand failed with code 0x%x origin 0x%x",
+// 			res, err_origin);
+// 		return 0;
+// 	}
+//
+// 	TEEC_CloseSession(&sess);
+// 	TEEC_FinalizeContext(&ctx);
+//
+// 	return (u32)op.params[0].value.b;
+// }
 
 static irqreturn_t kbase_job_irq_handler(int irq, void *data)
 {
@@ -114,13 +114,13 @@ static irqreturn_t kbase_job_irq_handler(int irq, void *data)
 		return IRQ_NONE;
 	}
 
-#ifdef CONFIG_SEC_MALI_GPU
-	if(!(val = kbase_request_secure_handler(JOB_IRQ_TAG, kbdev->reg))){
-		return IRQ_NONE;
-	}
-#else
+// #ifdef CONFIG_SEC_MALI_GPU
+// 	if(!(val = kbase_request_secure_handler(JOB_IRQ_TAG, kbdev->reg))){
+// 		return IRQ_NONE;
+// 	}
+// #else
 	val = kbase_reg_read(kbdev, JOB_CONTROL_REG(JOB_IRQ_STATUS));
-#endif
+// #endif
 
 #ifdef CONFIG_MALI_DEBUG
 	if (!kbdev->pm.backend.driver_ready_for_irqs)
@@ -158,13 +158,13 @@ static irqreturn_t kbase_mmu_irq_handler(int irq, void *data)
 
 	atomic_inc(&kbdev->faults_pending);
 
-#ifdef CONFIG_SEC_MALI_GPU
-	if(!(val = kbase_request_secure_handler(MMU_IRQ_TAG, kbdev->reg))){
-		return IRQ_NONE;
-	}
-else
+// #ifdef CONFIG_SEC_MALI_GPU
+// 	if(!(val = kbase_request_secure_handler(MMU_IRQ_TAG, kbdev->reg))){
+// 		return IRQ_NONE;
+// 	}
+// else
 	val = kbase_reg_read(kbdev, MMU_REG(MMU_IRQ_STATUS));
-#endif
+// #endif
 
 #ifdef CONFIG_MALI_DEBUG
 	if (!kbdev->pm.backend.driver_ready_for_irqs)
@@ -202,13 +202,13 @@ static irqreturn_t kbase_gpu_irq_handler(int irq, void *data)
 		return IRQ_NONE;
 	}
 
-#ifdef CONFIG_SEC_MALI_GPU
-	if(!(val = kbase_request_secure_handler(GPU_IRQ_TAG, kbdev->reg))){
-		return IRQ_NONE;
-	}
-#else
+// #ifdef CONFIG_SEC_MALI_GPU
+// 	if(!(val = kbase_request_secure_handler(GPU_IRQ_TAG, kbdev->reg))){
+// 		return IRQ_NONE;
+// 	}
+// #else
 	val = kbase_reg_read(kbdev, GPU_CONTROL_REG(GPU_IRQ_STATUS));
-#endif
+// #endif
 
 #ifdef CONFIG_MALI_DEBUG
 	if (!kbdev->pm.backend.driver_ready_for_irqs)
