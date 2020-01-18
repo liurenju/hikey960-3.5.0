@@ -21,6 +21,7 @@
  */
 
 #define LOG_LEVEL_NONE			U(0)
+#define LOG_LEVEL_RENJU_DEBUG	U(1)
 #define LOG_LEVEL_ERROR			U(10)
 #define LOG_LEVEL_NOTICE		U(20)
 #define LOG_LEVEL_WARNING		U(30)
@@ -41,6 +42,7 @@
  * be embedded in the format string and is expected by tf_log() to determine
  * the log level.
  */
+#define LOG_RENJU_DEBUG			"\x1" /* 1 */
 #define LOG_MARKER_ERROR		"\xa"	/* 10 */
 #define LOG_MARKER_NOTICE		"\x14"	/* 20 */
 #define LOG_MARKER_WARNING		"\x1e"	/* 30 */
@@ -64,6 +66,8 @@
 #else
 # define ERROR(...)	no_tf_log(LOG_MARKER_ERROR __VA_ARGS__)
 #endif
+
+#define RENJU_DEBUG(...)	tf_log(LOG_RENJU_DEBUG __VA_ARGS__)
 
 #if LOG_LEVEL >= LOG_LEVEL_NOTICE
 # define NOTICE(...)	tf_log(LOG_MARKER_NOTICE __VA_ARGS__)

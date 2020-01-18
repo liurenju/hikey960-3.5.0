@@ -34,6 +34,7 @@ BL31_SOURCES		+=	bl31/bl31_main.c				\
 				lib/aarch64/setjmp.S				\
 				lib/cpus/aarch64/dsu_helpers.S			\
 				plat/common/aarch64/platform_mp_stack.S		\
+				sec_deep/src/secdeep_integrity.c	\
 				services/arm_arch_svc/arm_arch_svc_setup.c	\
 				services/std_svc/std_svc_setup.c		\
 				${PSCI_LIB_SOURCES}				\

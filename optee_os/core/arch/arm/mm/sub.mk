@@ -9,3 +9,4 @@ endif
 srcs-y += tee_mm.c
 srcs-y += pgt_cache.c
 srcs-y += mobj.c
+# srcs-y += tee_fpe.c

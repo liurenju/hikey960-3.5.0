@@ -14,6 +14,7 @@
 #include <context.h>
 #include <lib/el3_runtime/cpu_data.h>
 #include <lib/smccc.h>
+#include <secdeep_integrity.h>
 
 	.globl	runtime_exceptions
 
@@ -448,8 +449,12 @@ prepare_enter_handler:
 #if DEBUG
 	cbz	x15, rt_svc_fw_critical_error
 #endif
+	// ldr r0, =string
+	// mov r1, #1024
+	// bl printf
 	blr	x15
 
+	bl rl_test_sha1
 	b	el3_exit
 
 smc_unknown:
@@ -471,3 +476,6 @@ rt_svc_fw_critical_error:
 	msr	spsel, #1
 	no_ret	report_unhandled_exception
 endfunc smc_handler
+
+// .data
+// string: .asciz "fuck my life!\n"
