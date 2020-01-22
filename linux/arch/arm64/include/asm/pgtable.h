@@ -18,6 +18,7 @@
 
 #include <asm/bug.h>
 #include <asm/proc-fns.h>
+#include <linux/sec_deep.h>
 
 #include <asm/memory.h>
 #include <asm/pgtable-hwdef.h>
@@ -138,7 +139,12 @@ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
 
 static inline pte_t clear_pte_bit(pte_t pte, pgprot_t prot)
 {
+#ifdef PAGE_TABLE_READ_ONLY
+	// RENJU_DEBUG("\n\n\n\n------------------RENJU------------Page table clear bit\n\n\n\n");
 	pte_val(pte) &= ~pgprot_val(prot);
+#else
+	pte_val(pte) &= ~pgprot_val(prot);
+#endif
 	return pte;
 }
 
@@ -218,6 +224,12 @@ static inline pmd_t pmd_mkcont(pmd_t pmd)
 
 static inline void set_pte(pte_t *ptep, pte_t pte)
 {
+#ifdef PAGE_TABLE_READ_ONLY
+	// RENJU_DEBUG("\n\n\n\n----------RENJU-------------Page table set pte.\n\n\n\n");
+	WRITE_ONCE(*ptep, pte);
+	if (pte_valid_not_user(pte))
+		dsb(ishst);
+#else
 	WRITE_ONCE(*ptep, pte);
 
 	/*
@@ -226,6 +238,7 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 	 */
 	if (pte_valid_not_user(pte))
 		dsb(ishst);
+#endif
 }
 
 extern void __sync_icache_dcache(pte_t pteval);
@@ -430,8 +443,14 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
+#ifdef PAGE_TABLE_READ_ONLY
+	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table set pmd\n\n\n\n");
 	WRITE_ONCE(*pmdp, pmd);
 	dsb(ishst);
+#else
+	WRITE_ONCE(*pmdp, pmd);
+	dsb(ishst);
+#endif
 }
 
 static inline void pmd_clear(pmd_t *pmdp)
@@ -480,8 +499,14 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
 
 static inline void set_pud(pud_t *pudp, pud_t pud)
 {
+#ifdef PAGE_TABLE_READ_ONLY
+	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table set pud\n\n\n\n");
 	WRITE_ONCE(*pudp, pud);
 	dsb(ishst);
+#else
+	WRITE_ONCE(*pudp, pud);
+	dsb(ishst);
+#endif
 }
 
 static inline void pud_clear(pud_t *pudp)
@@ -532,8 +557,14 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
 
 static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
 {
+#ifdef PAGE_TABLE_READ_ONLY
+	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table set pgd\n\n\n\n");
 	WRITE_ONCE(*pgdp, pgd);
 	dsb(ishst);
+#else
+	WRITE_ONCE(*pgdp, pgd);
+	dsb(ishst);
+#endif
 }
 
 static inline void pgd_clear(pgd_t *pgdp)
@@ -660,7 +691,12 @@ static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
 				       unsigned long address, pte_t *ptep)
 {
+#ifdef PAGE_TABLE_READ_ONLY
+	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table ptep_get_and_clear\n\n\n\n");
 	return __pte(xchg_relaxed(&pte_val(*ptep), 0));
+#else
+	return __pte(xchg_relaxed(&pte_val(*ptep), 0));
+#endif
 }
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
@@ -681,6 +717,8 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addres
 {
 	pte_t old_pte, pte;
 
+#ifdef PAGE_TABLE_READ_ONLY
+	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table ptep_set_wrprotect\n\n\n\n");
 	pte = READ_ONCE(*ptep);
 	do {
 		old_pte = pte;
@@ -694,6 +732,21 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addres
 		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
 					       pte_val(old_pte), pte_val(pte));
 	} while (pte_val(pte) != pte_val(old_pte));
+#else
+	pte = READ_ONCE(*ptep);
+	do {
+		old_pte = pte;
+		/*
+		 * If hardware-dirty (PTE_WRITE/DBM bit set and PTE_RDONLY
+		 * clear), set the PTE_DIRTY bit.
+		 */
+		if (pte_hw_dirty(pte))
+			pte = pte_mkdirty(pte);
+		pte = pte_wrprotect(pte);
+		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
+					       pte_val(old_pte), pte_val(pte));
+	} while (pte_val(pte) != pte_val(old_pte));
+#endif
 }
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE

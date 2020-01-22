@@ -32,6 +32,7 @@
 #include <linux/perf_event.h>
 #include <linux/preempt.h>
 #include <linux/hugetlb.h>
+#include <linux/sec_deep.h>
 
 #include <asm/bug.h>
 #include <asm/cmpxchg.h>
@@ -216,6 +217,8 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
 	 * be set to the most permissive (lowest value) of *ptep and entry
 	 * (calculated as: a & b == ~(~a | ~b)).
 	 */
+#ifdef PAGE_TABLE_READ_ONLY
+	// RENJU_DEBUG("\n\n\n\n----------RENJU-------------fault.c ptep_set_access_flags.\n\n\n\n");
 	pte_val(entry) ^= PTE_RDONLY;
 	pteval = pte_val(pte);
 	do {
@@ -228,6 +231,20 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
 
 	flush_tlb_fix_spurious_fault(vma, address);
 	return 1;
+#else
+	pte_val(entry) ^= PTE_RDONLY;
+	pteval = pte_val(pte);
+	do {
+		old_pteval = pteval;
+		pteval ^= PTE_RDONLY;
+		pteval |= pte_val(entry);
+		pteval ^= PTE_RDONLY;
+		pteval = cmpxchg_relaxed(&pte_val(*ptep), old_pteval, pteval);
+	} while (pteval != old_pteval);
+
+	flush_tlb_fix_spurious_fault(vma, address);
+	return 1;
+#endif
 }
 
 static bool is_el1_instruction_abort(unsigned int esr)
@@ -516,6 +533,9 @@ retry:
 		if (mm_flags & FAULT_FLAG_ALLOW_RETRY) {
 			mm_flags &= ~FAULT_FLAG_ALLOW_RETRY;
 			mm_flags |= FAULT_FLAG_TRIED;
+#ifdef PAGE_TABLE_READ_ONLY
+			RENJU_DEBUG("\n\n\n\n\n---------------Renju----------\n\n\n retrying");
+#endif
 			goto retry;
 		}
 	}
@@ -596,6 +616,11 @@ retry:
 	return 0;
 
 no_context:
+#ifdef PAGE_TABLE_READ_ONLY
+	// RENJU_DEBUG("\n\n\n\n---------RENJU----------ELR_EL1(0x%16lX)\n", read_sysreg(elr_el1));
+	RENJU_DEBUG("\n\n\n\n---------RENJU----------no context\n");
+	// printBlocksInfo_LIVE(BLOCKINFO_LOG_MASK_BLOCKS | BLOCKINFO_LOG_MASK_PTP_PAGES /*logMask*/);
+#endif
 	__do_kernel_fault(addr, esr, regs);
 	return 0;
 }
@@ -735,6 +760,17 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 {
 	const struct fault_info *inf = esr_to_fault_info(esr);
 	struct siginfo info;
+
+// #ifdef PAGE_TABLE_READ_ONLY
+// 	if (elr_el1 == 0x0000FFFFB7FDBDE0ULL) {
+// 		RENJU_DEBUG("CATCH1 !!! (%d)\n", count);
+// 	}
+//
+// 	if ( (far_el1 & ~0xFFFUL) == 0x0000FFFFB7FCC000UL) {
+// 		myprintk("CATCH2 !!! (0x%llx) (0x%llx) (%d)\n", v2p_at(far_el1), v2p_at(ERR_ADDR), count);
+// 		current->catch2_caught++;
+// 	}
+// #endif
 
 	if (!inf->fn(addr, esr, regs))
 		return;
