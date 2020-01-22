@@ -139,6 +139,12 @@ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
 
 static inline pte_t clear_pte_bit(pte_t pte, pgprot_t prot)
 {
+	if(system_state > SYSTEM_RUNNING)
+	{
+		//pass! Disable writing to the registers
+		panic("\n\n\n\n----Renju----trying to clear pte bit.\n");
+		return pte;
+	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n------------------RENJU------------Page table clear bit\n\n\n\n");
 	pte_val(pte) &= ~pgprot_val(prot);
@@ -224,6 +230,12 @@ static inline pmd_t pmd_mkcont(pmd_t pmd)
 
 static inline void set_pte(pte_t *ptep, pte_t pte)
 {
+	if(system_state > SYSTEM_RUNNING)
+	{
+		//pass! Disable writing to the registers
+		panic("\n\n\n\n----Renju----trying to set pte.\n\n\n\n");
+		return;
+	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n----------RENJU-------------Page table set pte.\n\n\n\n");
 	WRITE_ONCE(*ptep, pte);
@@ -443,6 +455,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
 
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
+	if(system_state > SYSTEM_RUNNING)
+	{
+		//pass! Disable writing to the registers
+		panic("\n\n\n\n----Renju----trying to set pmd.\n\n\n\n");
+		return;
+	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table set pmd\n\n\n\n");
 	WRITE_ONCE(*pmdp, pmd);
@@ -499,6 +517,12 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
 
 static inline void set_pud(pud_t *pudp, pud_t pud)
 {
+	if(system_state > SYSTEM_RUNNING)
+	{
+		//pass! Disable writing to the registers
+		panic("\n\n\n\n----Renju----trying to set pud.\n\n\n\n");
+		return;
+	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table set pud\n\n\n\n");
 	WRITE_ONCE(*pudp, pud);
@@ -557,6 +581,12 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
 
 static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
 {
+	if(system_state > SYSTEM_RUNNING)
+	{
+		//pass! Disable writing to the registers
+		panic("\n\n\n\n----Renju----trying to set pgd.\n\n\n\n");
+		return;
+	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table set pgd\n\n\n\n");
 	WRITE_ONCE(*pgdp, pgd);
@@ -691,6 +721,12 @@ static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
 				       unsigned long address, pte_t *ptep)
 {
+	if(system_state > SYSTEM_RUNNING)
+	{
+		//pass! Disable writing to the registers
+		panic("\n\n\n\n----Renju----trying to ptep_get_and_clear.\n\n\n\n");
+		return *ptep;
+	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table ptep_get_and_clear\n\n\n\n");
 	return __pte(xchg_relaxed(&pte_val(*ptep), 0));
@@ -716,7 +752,6 @@ static inline pmd_t pmdp_huge_get_and_clear(struct mm_struct *mm,
 static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long address, pte_t *ptep)
 {
 	pte_t old_pte, pte;
-
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table ptep_set_wrprotect\n\n\n\n");
 	pte = READ_ONCE(*ptep);

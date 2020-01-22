@@ -14,6 +14,7 @@
 #include <linux/linkage.h>
 #include <linux/arm-smccc.h>
 #include <asm/asm-offsets.h>
+#include <asm-generic/export.h>
 
 	.macro SMCCC instr
 	.cfi_startproc
@@ -50,3 +51,14 @@ ENDPROC(__arm_smccc_smc)
 ENTRY(__arm_smccc_hvc)
 	SMCCC	hvc
 ENDPROC(__arm_smccc_hvc)
+
+ENTRY(__secdeep_smc)
+	cbz x5, 1f
+	dc ivac, x5
+1:
+	dmb sy
+	isb sy
+	smc #0x798
+	ret
+ENDPROC(__secdeep_smc)
+EXPORT_SYMBOL(__secdeep_smc)
