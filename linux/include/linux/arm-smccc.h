@@ -113,6 +113,14 @@ struct arm_smccc_quirk {
 	} state;
 };
 
+void secdeep_smc(unsigned long smc_cmd, unsigned long a1,
+			unsigned long a2, unsigned long a3, unsigned long a4,
+			unsigned long a5);
+
+asmlinkage void __secdeep_smc(unsigned long smc_cmd, unsigned long a1,
+			unsigned long a2, unsigned long a3, unsigned long a4,
+			unsigned long a5);
+
 /**
  * __arm_smccc_smc() - make SMC calls
  * @a0-a7: arguments passed in registers 0 to 7

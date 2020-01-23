@@ -42,6 +42,8 @@
 #include <linux/syscore_ops.h>
 #include <linux/version.h>
 #include <linux/ctype.h>
+#include <linux/sec_deep.h>
+#include <linux/arm-smccc.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
@@ -2639,3 +2641,81 @@ COMPAT_SYSCALL_DEFINE1(sysinfo, struct compat_sysinfo __user *, info)
 	return 0;
 }
 #endif /* CONFIG_COMPAT */
+
+// Reference from Ginseng. Modified for our own purposes.
+unsigned long long getEntry(unsigned long long addr, int bKaddr, int bCheckAP, int *pIsBlock) {
+	pgd_t *pPgd;
+	pud_t *pPud;
+	pmd_t *pPmd;
+	pte_t *pPte;
+	unsigned long long pud;
+	unsigned long long pmd;
+	unsigned long long pte;
+	unsigned long long oa;
+	int bSilent = 1;
+
+	if (pIsBlock) *pIsBlock = 0;
+
+	if (addr >= 0xFFFF000000000000ULL) {
+		if (!bKaddr) panic("User address, but kernel.");
+	} else {
+		if (bKaddr) panic("Kernel address, but user.");
+	}
+
+	if (likely(bKaddr)) pPgd = pgd_offset_k(addr);
+	else pPgd = pgd_offset(current->mm, addr);
+
+	if (pgd_none(*pPgd)) {
+		panic("PGD_NONE (0x%llx) @ (0x%llx)", (unsigned long long) pgd_val(*pPgd), (unsigned long long) pPgd);
+		return -1;
+	}
+	pPud = pud_offset(pPgd, addr);
+	if(pud_none(*pPud)) {
+		panic("PUD_NONE");
+		return -2;
+	}
+	pud = pud_val((*pPud));
+	if ( (pud & 0b11) == 0b1 ) {
+		oa = pud & PMD_ADDR_MASK;
+		return oa;
+	}
+
+	pPmd = pmd_offset(pPud, addr);
+	if(pmd_none(*pPmd)) {
+		panic("PMD_NONE");
+		return -3;
+	}
+	pmd = pmd_val((*pPmd));
+	if ( (pmd & 0b11) == 0b1 ) {
+		oa = pmd & PT_ADDR_MASK;
+		if (pIsBlock) *pIsBlock = 1;
+		if (bCheckAP) {
+			return GET_BLOCK_FIELD(pmd, AP);
+		}
+		return oa;
+	}
+
+	pPte = pte_offset_kernel(pPmd, addr);
+	if (pte_none(*pPte)) {
+		panic("PTE_NONE");
+		return -4;
+	}
+	pte = pte_val((*pPte));
+	if (!((pte & 0b11) != 0b11 && !bSilent))
+	{
+		oa = pte & OA_ADDR_MASK;
+		if (bCheckAP) {
+			return GET_PTE_FIELD(pte, AP);
+		}
+		return oa;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(getEntry);
+
+void secdeep_smc(unsigned long smc_cmd, unsigned long a1,
+			unsigned long a2, unsigned long a3, unsigned long a4,
+			unsigned long a5) {
+	__secdeep_smc(smc_cmd, a1, a2, a3, a4, a5);
+}
+EXPORT_SYMBOL(secdeep_smc);

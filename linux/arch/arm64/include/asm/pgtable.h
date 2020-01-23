@@ -50,6 +50,9 @@ extern void __pte_error(const char *file, int line, unsigned long val);
 extern void __pmd_error(const char *file, int line, unsigned long val);
 extern void __pud_error(const char *file, int line, unsigned long val);
 extern void __pgd_error(const char *file, int line, unsigned long val);
+extern unsigned long long getEntry(unsigned long long addr, int bKaddr, int bCheckAP, int *pIsBlock);
+
+#include <linux/arm-smccc.h>
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
@@ -147,7 +150,27 @@ static inline pte_t clear_pte_bit(pte_t pte, pgprot_t prot)
 	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n------------------RENJU------------Page table clear bit\n\n\n\n");
-	pte_val(pte) &= ~pgprot_val(prot);
+	if(system_state == SYSTEM_RUNNING){
+		int ap = getEntry((unsigned long long) &pte, 1, 1, NULL);
+		pte_t newPte;
+		pte_val(newPte) = pte_val(pte) & ~pgprot_val(prot);
+		if (ap & 0b10) {
+			dc_invalidate_single(&pte);
+			secdeep_smc(SMC_CMD_SET_64BIT, (unsigned long long) &pte, pte_val(newPte), 0, 0, 0);
+
+			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
+			pte_val(pte) &= ~pgprot_val(prot);
+
+			if (pte_val(pte) != pte_val(newPte)){
+				panic("---Renju---clear pte bit error");
+			}
+		} else {
+			pte_val(pte) &= ~pgprot_val(prot);
+		}
+	}
+	else {
+		pte_val(pte) &= ~pgprot_val(prot);
+	}
 #else
 	pte_val(pte) &= ~pgprot_val(prot);
 #endif
@@ -238,19 +261,35 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n----------RENJU-------------Page table set pte.\n\n\n\n");
-	WRITE_ONCE(*ptep, pte);
-	if (pte_valid_not_user(pte))
-		dsb(ishst);
+	if(system_state == SYSTEM_RUNNING){
+		int ap = getEntry((unsigned long long) ptep, 1, 1, NULL);
+		if (ap & 0b10) {
+			dc_invalidate_single(ptep);	// This makes the SW change the real data in mem not in cache.
+			secdeep_smc(SMC_CMD_SET_64BIT_DCI, (unsigned long long) ptep, pte_val(pte), 0, 0, 0);
+
+			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
+			WRITE_ONCE(*ptep, pte);
+
+			if(pte_val(*ptep) != pte_val(pte)) {
+				panic("----RENJU---- set_pte()");
+			}
+		}
+		else {
+			WRITE_ONCE(*ptep, pte);
+		}
+	}
+	else {
+		WRITE_ONCE(*ptep, pte);
+	}
 #else
 	WRITE_ONCE(*ptep, pte);
-
+#endif
 	/*
 	 * Only if the new pte is valid and kernel, otherwise TLB maintenance
 	 * or update_mmu_cache() have the necessary barriers.
 	 */
 	if (pte_valid_not_user(pte))
 		dsb(ishst);
-#endif
 }
 
 extern void __sync_icache_dcache(pte_t pteval);
@@ -463,12 +502,30 @@ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table set pmd\n\n\n\n");
-	WRITE_ONCE(*pmdp, pmd);
-	dsb(ishst);
+	if(system_state == SYSTEM_RUNNING) {
+		int ap = getEntry((unsigned long long) pmdp, 1, 1, NULL);
+		if (ap & 0b10) {
+			dc_invalidate_single(pmdp);
+			secdeep_smc(SMC_CMD_SET_64BIT, (unsigned long long) pmdp, pmd_val(pmd), 0, 0, 0);
+
+			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
+			WRITE_ONCE(*pmdp, pmd);
+
+			if(pmd_val(*pmdp) != pmd_val(pmd)) {
+				panic("----RENJU---- set_pmd()");
+			}
+		}
+		else {
+			WRITE_ONCE(*pmdp, pmd);
+		}
+	}
+	else {
+		WRITE_ONCE(*pmdp, pmd);
+	}
 #else
 	WRITE_ONCE(*pmdp, pmd);
-	dsb(ishst);
 #endif
+	dsb(ishst);
 }
 
 static inline void pmd_clear(pmd_t *pmdp)
@@ -525,12 +582,31 @@ static inline void set_pud(pud_t *pudp, pud_t pud)
 	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table set pud\n\n\n\n");
-	WRITE_ONCE(*pudp, pud);
-	dsb(ishst);
+	if(system_state == SYSTEM_RUNNING) {
+		int ap = getEntry((unsigned long long) pudp, 1, 1, NULL);
+		if (ap & 0b10) {
+			dc_invalidate_single(pudp);
+			secdeep_smc(SMC_CMD_SET_64BIT, (unsigned long long) pudp, pud_val(pud), 0, 0, 0);
+
+			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
+			WRITE_ONCE(*pudp, pud);
+
+			if(pud_val(*pudp) != pud_val(pud)) {
+				panic("----RENJU---- set_pud()");
+			}
+		}
+		else {
+			WRITE_ONCE(*pudp, pud);
+		}
+	}
+	else
+	{
+		WRITE_ONCE(*pudp, pud);
+	}
 #else
 	WRITE_ONCE(*pudp, pud);
-	dsb(ishst);
 #endif
+	dsb(ishst);
 }
 
 static inline void pud_clear(pud_t *pudp)
@@ -589,12 +665,31 @@ static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
 	}
 #ifdef PAGE_TABLE_READ_ONLY
 	// RENJU_DEBUG("\n\n\n\n\n------------------RENJU----------------page table set pgd\n\n\n\n");
-	WRITE_ONCE(*pgdp, pgd);
-	dsb(ishst);
+	if(system_state == SYSTEM_RUNNING) {
+		int ap = getEntry((unsigned long long) pgdp, 1, 1, NULL);
+		if (ap & 0b10) {
+			dc_invalidate_single(pgdp);
+			secdeep_smc(SMC_CMD_SET_64BIT, (unsigned long long) pgdp, pgd_val(pgd), 0, 0, 0);
+
+			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
+			WRITE_ONCE(*pgdp, pgd);
+
+			if(pgd_val(*pgdp) != pgd_val(pgd)) {
+				panic("----RENJU---- set_pgd()");
+			}
+		}
+		else {
+			WRITE_ONCE(*pgdp, pgd);
+		}
+	}
+	else
+	{
+		WRITE_ONCE(*pgdp, pgd);
+	}
 #else
 	WRITE_ONCE(*pgdp, pgd);
-	dsb(ishst);
 #endif
+	dsb(ishst);
 }
 
 static inline void pgd_clear(pgd_t *pgdp)
