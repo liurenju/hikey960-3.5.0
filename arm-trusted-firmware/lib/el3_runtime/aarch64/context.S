@@ -18,6 +18,8 @@
 	.global	restore_gp_registers
 	.global	restore_gp_registers_eret
 	.global	el3_exit
+  .global save_renju_registers
+  .global restore_renju_registers
 
 /* -----------------------------------------------------
  * The following function strictly follows the AArch64
@@ -331,6 +333,48 @@ func save_gp_registers
 	str	x18, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_SP_EL0]
 	ret
 endfunc save_gp_registers
+
+func save_renju_registers
+	stp	x0, x1, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X0 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x2, x3, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X2 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x4, x5, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X4 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x6, x7, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X6 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x8, x9, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X8 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x10, x11, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X10 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x12, x13, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X12 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x14, x15, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X14 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x16, x17, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X16 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x18, x19, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X18 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x20, x21, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X20 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x22, x23, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X22 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x24, x25, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X24 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x26, x27, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X26 + CTX_GPREGS_RENJU_OFFSET]
+	stp	x28, x29, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X28 + CTX_GPREGS_RENJU_OFFSET]
+	mrs	x18, sp_el0
+	str	x18, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_SP_EL0 + CTX_GPREGS_RENJU_OFFSET]
+	ret
+endfunc save_renju_registers
+
+func restore_renju_registers
+	ldp	x0, x1, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X0 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x2, x3, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X2 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x4, x5, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X4 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x6, x7, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X6 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x8, x9, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X8 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x10, x11, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X10 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x12, x13, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X12 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x14, x15, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X14 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x16, x17, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X16 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x18, x19, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X18 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x20, x21, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X20 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x22, x23, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X22 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x24, x25, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X24 + CTX_GPREGS_RENJU_OFFSET]
+	ldp	x26, x27, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X26 + CTX_GPREGS_RENJU_OFFSET]
+	ldr	x28, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_SP_EL0 + CTX_GPREGS_RENJU_OFFSET]
+	msr	sp_el0, x28
+	ldp	x28, x29, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X28 + CTX_GPREGS_RENJU_OFFSET]
+	ret
+endfunc restore_renju_registers
 
 /*
  * This function restores all general purpose registers except x30 from the

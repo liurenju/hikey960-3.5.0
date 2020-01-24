@@ -18,6 +18,20 @@
 
 	.globl	runtime_exceptions
 
+	.macro disalbeAFault
+	mrs x0, sctlr_el3
+	bic x0, x0, #2
+	msr sctlr_el3, x0
+	isb sy
+	.endm
+
+	// clobber: x0
+	.macro enableAFault
+	mrs x0, sctlr_el3
+	orr x0, x0, #2
+	msr sctlr_el3, x0
+	.endm
+
 	.globl	sync_exception_sp_el0
 	.globl	irq_sp_el0
 	.globl	fiq_sp_el0
@@ -420,6 +434,8 @@ prepare_enter_handler:
 	 * SP_EL0 i.e. EL3 runtime stack. It was saved in the 'cpu_context'
 	 * structure prior to the last ERET from EL3.
 	 */
+
+
 	ldr	x12, [x6, #CTX_EL3STATE_OFFSET + CTX_RUNTIME_SP]
 
 	/* Switch to SP_EL0 */
@@ -449,12 +465,11 @@ prepare_enter_handler:
 #if DEBUG
 	cbz	x15, rt_svc_fw_critical_error
 #endif
-	// ldr r0, =string
-	// mov r1, #1024
-	// bl printf
 	blr	x15
 
+	disalbeAFault
 	bl code_integrity_request
+	enableAFault
 	b	el3_exit
 
 smc_unknown:
