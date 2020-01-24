@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
+ #define SMC_CMD_SET_64BIT									0x7920
+ #define SMC_CMD_SET_64BIT_DCI								0x7921
+ #define VA_BITS  0x30
+ #define PAGE_OFFSET 0xFFFF800000000000
+ #define KIMAGE_VOFFSET 0xFFFF000008000000
+#define PHYS_OFFSET 0x0
+
 #ifndef __ASSEMBLY__
 #include <stdint.h>
 

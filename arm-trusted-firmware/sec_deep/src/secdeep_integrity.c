@@ -288,3 +288,85 @@ void rl_test_sha1() {
   // RENJU_DEBUG("\n----------Renju--------------------\n\n\n\n\n");
   return;
 }
+
+void dci(uint64_t dest_pa) {
+  asm volatile (
+			"dc ivac, %0\n"  \
+			"dmb sy\n" \
+			"isb sy\n" \
+			:
+			: "r" (dest_pa)
+			: "memory"
+			);
+}
+
+void dcci(uint64_t dest_pa) {
+  asm volatile (
+      "dc civac, %0\n"  \
+			"dmb sy\n" \
+			"isb sy\n"
+			:
+			: "r" (dest_pa)
+			: "memory"
+	);
+}
+
+// uint64_t BIT(uint64_t nr) {
+//   return ((uint64_t) 1) << nr;
+// }
+
+uint64_t __pa(uint64_t x) {
+  if ((x & BIT_64(VA_BITS -1)) == 0) {
+    return x- KIMAGE_VOFFSET;
+  }
+
+  return ((x & !PAGE_OFFSET) + PHYS_OFFSET);
+}
+
+void _set64bit(uint64_t dest_va, uint64_t src_val, int bdci) {
+  uint64_t dest_pa = __pa(dest_va);
+  if (bdci) {
+    dci(dest_pa);
+  }
+
+  asm volatile (
+      "mrs x15, sctlr_el3\n"  \
+  		"bic x15, x15, #1\n"  \
+  		"mov x9, %0\n" \
+  		"mov x10, %1\n" \
+			"msr sctlr_el3, x15\n" \
+			"isb sy\n" \
+			"str x10, [x9]\n"  \
+			"dmb sy\n" \
+			"orr x15, x15, #1\n" \
+			"msr sctlr_el3, x15\n" \
+			"isb sy"
+			:
+			: "r" (dest_pa), "r" (src_val)
+			: "memory",
+			"x15", 	// sctrl save
+			"x9", 	// dest_pa
+			"x10"	// src_Val
+	);
+
+  if (bdci) {
+    dcci(dest_pa);
+  }
+}
+
+uint64_t code_integrity_request(uint64_t smc_cmd, uint64_t a1,
+  uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t sp1) {
+    if(smc_cmd != SMC_CMD_SET_64BIT && smc_cmd != SMC_CMD_SET_64BIT_DCI) {
+      RENJU_DEBUG("\n\n\n\n\n----------RENJU-----ERROR------ unrecognize command.\n\n\n");
+      return 1;
+    }
+
+    if(smc_cmd == SMC_CMD_SET_64BIT) {
+      _set64bit(a1, a2, 0);
+    }
+    else if(smc_cmd == SMC_CMD_SET_64BIT_DCI) {
+      _set64bit(a1, a2, 1);
+    }
+    // hello world
+    return 0;
+  }

@@ -159,7 +159,7 @@ static inline pte_t clear_pte_bit(pte_t pte, pgprot_t prot)
 			secdeep_smc(SMC_CMD_SET_64BIT, (unsigned long long) &pte, pte_val(newPte), 0, 0, 0);
 
 			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
-			pte_val(pte) &= ~pgprot_val(prot);
+			// pte_val(pte) &= ~pgprot_val(prot);
 
 			if (pte_val(pte) != pte_val(newPte)){
 				panic("---Renju---clear pte bit error");
@@ -268,7 +268,7 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 			secdeep_smc(SMC_CMD_SET_64BIT_DCI, (unsigned long long) ptep, pte_val(pte), 0, 0, 0);
 
 			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
-			WRITE_ONCE(*ptep, pte);
+			// WRITE_ONCE(*ptep, pte);
 
 			if(pte_val(*ptep) != pte_val(pte)) {
 				panic("----RENJU---- set_pte()");
@@ -509,7 +509,7 @@ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 			secdeep_smc(SMC_CMD_SET_64BIT, (unsigned long long) pmdp, pmd_val(pmd), 0, 0, 0);
 
 			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
-			WRITE_ONCE(*pmdp, pmd);
+			// WRITE_ONCE(*pmdp, pmd);
 
 			if(pmd_val(*pmdp) != pmd_val(pmd)) {
 				panic("----RENJU---- set_pmd()");
@@ -589,7 +589,7 @@ static inline void set_pud(pud_t *pudp, pud_t pud)
 			secdeep_smc(SMC_CMD_SET_64BIT, (unsigned long long) pudp, pud_val(pud), 0, 0, 0);
 
 			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
-			WRITE_ONCE(*pudp, pud);
+			// WRITE_ONCE(*pudp, pud);
 
 			if(pud_val(*pudp) != pud_val(pud)) {
 				panic("----RENJU---- set_pud()");
@@ -672,7 +672,7 @@ static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
 			secdeep_smc(SMC_CMD_SET_64BIT, (unsigned long long) pgdp, pgd_val(pgd), 0, 0, 0);
 
 			//RL WARNING! THIS LINE NEEDS TO BE REMOVED!
-			WRITE_ONCE(*pgdp, pgd);
+			// WRITE_ONCE(*pgdp, pgd);
 
 			if(pgd_val(*pgdp) != pgd_val(pgd)) {
 				panic("----RENJU---- set_pgd()");
