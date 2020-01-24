@@ -1,5 +1,6 @@
 // Implemented through openSSL.
 // Ref: https://github.com/susienme/ndss2019_ginseng_arm-trusted-firmware/blob/master/spath_rust/src/sha1-armv8.S
+// SHA1 is Implemented using open source sha1 implementation.
 
 #include <stdio.h>
 #include <string.h>
@@ -263,7 +264,7 @@ void SHA1Final(
 void SHA1(
     char *hash_out,
     char *str,
-    int len)
+    uint64_t len)
 {
     SHA1_CTX ctx;
     unsigned int ii;
@@ -354,13 +355,138 @@ void _set64bit(uint64_t dest_va, uint64_t src_val, int bdci) {
   }
 }
 
+uint64_t KERN_PA(uint64_t addr) {
+  uint64_t pa;
+  asm volatile(
+	  "mrs x15, sctlr_el3\n" \
+		"bic x15, x15, #1\n"  \
+		"mov x10, %1\n" \
+		"msr sctlr_el3, x15\n"  \
+		"isb sy\n"  \
+		"ldr x9, [x10]\n" \
+		"dmb sy\n"  \
+		"orr x15, x15, #1\n"  \
+		"msr sctlr_el3, x15\n"  \
+		"isb sy\n"  \
+		"mov %0, x9"
+		: "=r" (pa)
+		: "r" (addr)
+		: "memory",
+		"x15", 	// sctrl save
+		"x9", 	// out
+		"x10"	// src_Val
+	);
+  return pa;
+}
+
+uint64_t check_pte(uint64_t addr, uint64_t upper, uint64_t lower) {
+  int i = 0;
+  for(; i < 512; i++) {
+    uint64_t pte = KERN_PA(addr + 8 * i);
+    if(pte){
+      if(pte > lower && pte < upper) return 1;
+      if((pte = pte & 0b11) == 0b11) {
+        if((pte & 0xFFFFFFFFF000) > lower && (pte & 0xFFFFFFFFF000) < upper) {
+          return 1;
+        }
+      }
+    }
+  }
+  return 0;
+}
+
+uint64_t check_pmd(uint64_t addr, uint64_t upper, uint64_t lower) {
+  int i = 0;
+  for(; i < 512 ; i++) {
+    uint64_t pmd_e = KERN_PA(addr + 8 * i);
+    if (pmd_e) {
+      if (pmd_e > lower && pmd_e < upper) return 1;
+      uint64_t pte = (pmd_e & 0xFFFFFFFFF000);
+      return check_pmd(pte, upper, lower);
+    }
+  }
+  return 0;
+}
+
+uint64_t check_pud(uint64_t addr, uint64_t upper, uint64_t lower) {
+  int i = 0;
+  for(; i < 512 ; i++) {
+    uint64_t pud_e = KERN_PA(addr + 8 * i);
+    if (pud_e) {
+      if (pud_e > lower && pud_e < upper) return 1;
+      uint64_t pmd_e = pud_e & 0xFFFFFFFFF000;
+      return check_pmd(pmd_e, upper, lower);
+    }
+  }
+  return 0;
+}
+
+uint64_t getTtbr1() {
+  uint64_t ret;
+  asm volatile (
+    "mrs %0, ttbr1_el1"
+		: "=r" (ret)
+		:
+		: "memory"
+  );
+  return ret;
+}
+
+uint64_t safeMapping(uint64_t upper, uint64_t lower) {
+  // walk the page table to ensure the mapping is safe.
+  uint64_t ttbr1 = getTtbr1();
+  int i = 0;
+
+  for(;i < 512; i++) {
+    uint64_t pgd_e = KERN_PA(ttbr1 + 8 * i);
+    if(pgd_e) {
+      uint64_t pud_e = (pgd_e & 0xFFFFFFFFF000);
+      if (pud_e > lower && pud_e < upper) {
+        // Unsafe
+        return 1;
+      }
+      return check_pud(pud_e, upper, lower);
+    }
+  }
+  return 0;
+}
+
+uint8_t loading_integrity(
+  uint64_t base_addr,
+  uint64_t size,
+  char* expected_hash
+) {
+  char real_hash[20];
+  SHA1(real_hash, (char *)base_addr, size);
+
+  for(int i = 0; i < 20; i++) {
+    if(expected_hash[i] != real_hash[i]) {
+      return 1;
+    }
+  }
+
+  return 0;
+}
+
 void code_integrity_request(uint64_t smc_cmd, uint64_t a1,
   uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t sp1) {
     if(smc_cmd == SMC_CMD_SET_64BIT) {
-      _set64bit(a1, a2, 0);
+      if(!safeMapping(a3, a4)) {
+        _set64bit(a1, a2, 0);
+      }
     }
     else if(smc_cmd == SMC_CMD_SET_64BIT_DCI) {
-      _set64bit(a1, a2, 1);
+      if(!safeMapping(a3, a4)) {
+        _set64bit(a1, a2, 1);
+      }
+    }
+    else if(smc_cmd == SMC_CMD_PROGRAM_ENTRY) {
+      // RENJU LIU: For evaluation purpose, we directly use the hash.
+      char expected_hash[20];
+      SHA1(expected_hash, (char *)a1, a2);
+      if(loading_integrity(a1, a2, expected_hash)) {
+        ERROR("\n\n\n-----ERROR----\nThe program has been tampered.\n\n\n\n");
+      }
     }
     else {
       // Other commands;

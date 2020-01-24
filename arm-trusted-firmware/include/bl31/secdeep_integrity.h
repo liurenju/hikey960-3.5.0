@@ -5,7 +5,8 @@
  */
 
  #define SMC_CMD_SET_64BIT									0x7920
- #define SMC_CMD_SET_64BIT_DCI								0x7921
+ #define SMC_CMD_SET_64BIT_DCI							0x7921
+ #define SMC_CMD_PROGRAM_ENTRY              0x7922
  #define VA_BITS  0x30
  #define PAGE_OFFSET 0xFFFF800000000000
  #define KIMAGE_VOFFSET 0xFFFF000008000000
@@ -54,5 +55,5 @@ void SHA1Final(
 void SHA1(
     char *hash_out,
     char *str,
-    int len);
+    uint64_t len);
 #endif /* SHA1_H */
