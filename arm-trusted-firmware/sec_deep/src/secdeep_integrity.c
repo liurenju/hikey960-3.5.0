@@ -471,7 +471,9 @@ uint8_t loading_integrity(
 void code_integrity_request(uint64_t smc_cmd, uint64_t a1,
   uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t sp1) {
     if(smc_cmd == SMC_CMD_SET_64BIT) {
+      // RENJU_DEBUG("\n\n\n\n\n\n--------------RENJU------HERE\n\n\n\n");
       if(!safeMapping(a3, a4)) {
+        // RENJU_DEBUG("\n\n\n\n\n\n--------------RENJU------safeMapping\n\n\n\n");
         _set64bit(a1, a2, 0);
       }
     }

@@ -25,6 +25,17 @@
 	isb sy
 	.endm
 
+	.macro save_x18_to_x29_sp_el0
+	stp	x18, x19, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X18]
+	stp	x20, x21, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X20]
+	stp	x22, x23, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X22]
+	stp	x24, x25, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X24]
+	stp	x26, x27, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X26]
+	stp	x28, x29, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X28]
+	mrs	x18, sp_el0
+	str	x18, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_SP_EL0]
+	.endm
+
 	// clobber: x0
 	.macro enableAFault
 	mrs x0, sctlr_el3
@@ -374,7 +385,95 @@ smc_handler64:
 	 * contain flags we need to pass to the handler.
 	 */
 	bl	save_gp_registers
+	/*
+	 * Populate the parameters for the SMC handler.
+	 * We already have x0-x4 in place. x5 will point to a cookie (not used
+	 * now). x6 will point to the context structure (SP_EL3) and x7 will
+	 * contain flags we need to pass to the handler Hence save x5-x7.
+	 *
+	 * Note: x4 only needs to be preserved for AArch32 callers but we do it
+	 *       for AArch64 callers as well for convenience
+	 */
+	//////////////////////////// YMH_START
+	//
+	stp	x0, x1, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X0]
+	stp	x2, x3, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X2]
+	//
+	//////////////////////////// YMH_END
+	stp	x4, x5, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X4]
+	stp	x6, x7, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X6]
 
+	/* Save rest of the gpregs and sp_el0*/
+	save_x18_to_x29_sp_el0
+
+	//////////////////////////// YMH_START
+	//
+	// x0-x5 contain params (6)
+	// x6, x7 are temp
+	mrs x7, esr_el3
+
+	lsr	x6, x7, #25	// exception class (EC) | IL
+	cmp x6, #0b0101111 // 0b010111 (SMC) | 0b1 (DA)
+	b.ne 99f
+
+	ubfx x6, x7, 0, #16 // #imm16
+
+
+18:	cmp x6, #10  // all exceptions from EL1
+	b.eq 2f
+
+	cmp x6, #11  // TTBR trap
+	b.eq 2f
+	b 99f // not (10 | 11)
+
+2: 	// will be rached because callRS does ERET
+	eret
+
+99:
+	cmp x6, #18
+	b.le 99f	// OLD: Not my SMC -> jump to the normal SMC
+
+
+// SMC for PTP change from the kernel
+88:
+	mov	x6, sp
+	/* -----------------------------------------------------
+	 * Restore the saved C runtime stack value which will
+	 * become the new SP_EL0 i.e. EL3 runtime stack. It was
+	 * saved in the 'cpu_context' structure prior to the last
+	 * ERET from EL3.
+	 * -----------------------------------------------------
+	 */
+	ldr	x12, [x6, #CTX_EL3STATE_OFFSET + CTX_RUNTIME_SP]
+
+
+	/* Switch to SP_EL0 */
+	msr	spsel, #0
+
+	/* -----------------------------------------------------
+	 * Save the SPSR_EL3, ELR_EL3, & SCR_EL3 in case there
+	 * is a world switch during SMC handling.
+	 * TODO: Revisit if all system registers can be saved
+	 * later.
+	 * -----------------------------------------------------
+	 */
+	mrs	x16, spsr_el3
+	mrs	x17, elr_el3
+	mrs	x18, scr_el3
+	stp	x16, x17, [x6, #CTX_EL3STATE_OFFSET + CTX_SPSR_EL3]
+	str	x18, [x6, #CTX_EL3STATE_OFFSET + CTX_SCR_EL3]
+
+	mov	sp, x12
+
+	disalbeAFault		// <-- clobber: X0
+	ldr x0, [x6, #CTX_GPREGS_OFFSET + CTX_GPREG_X0]
+
+
+	bl code_integrity_request	// <-- return void
+	enableAFault		// <-- clobber: X0, but don't need to restore here because el3_exit will do
+	b el3_exit
+
+99:
 	mov	x5, xzr
 	mov	x6, sp
 
@@ -466,10 +565,6 @@ prepare_enter_handler:
 	cbz	x15, rt_svc_fw_critical_error
 #endif
 	blr	x15
-
-	disalbeAFault
-	bl code_integrity_request
-	enableAFault
 	b	el3_exit
 
 smc_unknown:
