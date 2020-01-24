@@ -454,7 +454,7 @@ prepare_enter_handler:
 	// bl printf
 	blr	x15
 
-	bl rl_test_sha1
+	bl code_integrity_request
 	b	el3_exit
 
 smc_unknown:
