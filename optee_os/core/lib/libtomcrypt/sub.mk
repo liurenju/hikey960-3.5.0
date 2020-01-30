@@ -33,4 +33,4 @@ endif
 endif
 
 srcs-y += tomcrypt.c
-
+srcs-y += secdeep_fpe.c
