@@ -26,6 +26,9 @@ int add_entry(int key) {
   }
   initialized[index] = 1;
   hashL1[index] = (int *)malloc(sizeof(int) * HASH2_SIZE);
+  for(int i = 0; i < HASH2_SIZE; i++) {
+    hashL1[index][i] = 0;
+  }
   return 0;
 }
 
@@ -55,6 +58,13 @@ int hash_add_pair(int key, int value) {
 
   add_entry(key);
   int entry_l2 = key % HASH2_SIZE;
+  if(hashL1[index][entry_l2]) {
+    if (hashL1[index][entry_l2] != value) {
+      panic("secdeep: Hash collisions");
+      return 1;
+    }
+    return 0;
+  }
   hashL1[index][entry_l2] = value;
   return 0;
 }
