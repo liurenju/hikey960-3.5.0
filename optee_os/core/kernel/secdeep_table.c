@@ -1,6 +1,9 @@
 // The implementation of secdeep table.
 #include <kernel/secdeep_table.h>
 
+char entry = 0;
+uint32_t table_size = 0;
+
 void secdeep_hash_init(void) {
   for(int i = 0; i < HASH1_SIZE; i++) {
     initialized[i] = 0;
@@ -12,6 +15,7 @@ int add_entry(int key) {
   if(!entry) {
     secdeep_hash_init();
     entry = 1;
+    table_size = 0;
   }
 
   int index = key / HASH1_SIZE;
@@ -51,6 +55,13 @@ int hash_get_value(int key, int* value) {
 
 int hash_add_pair(int key, int value) {
   int index = key / HASH1_SIZE;
+
+  if(++table_size > MAX_TABLE_SIZE || thread_stack_size() > MAX_SECURE_SIZE) {
+    DMSG("Renju: Max table size achieved. Because of %s\n",
+      thread_stack_size() > MAX_SECURE_SIZE ? "thread_stack_size" : "table_size");
+    return 1;
+  }
+
   if (index >= HASH_MAX) {
     DMSG("Max hash value exceeded.");
     return 1;
@@ -74,5 +85,6 @@ int secdeep_hash_delete(void) {
     initialized[i] = 0;
   }
   entry = 0;
+  table_size = 0;
   return 0;
 }

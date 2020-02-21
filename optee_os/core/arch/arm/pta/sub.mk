@@ -15,4 +15,4 @@ srcs-$(CFG_TEE_BENCHMARK) += benchmark.c
 srcs-$(CFG_SDP_PTA) += sdp_pta.c
 srcs-$(CFG_SYSTEM_PTA) += system.c
 srcs-$(CFG_DEVICE_ENUM_PTA) += device.c
-srcs-$(CFG_TEE_MALI_GPU) += mali_driver.c
+srcs-y += secdeep_pta.c

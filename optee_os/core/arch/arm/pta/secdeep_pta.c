@@ -1,4 +1,4 @@
-#include <pta_mali_driver_ta.h>
+#include <pta_secdeep.h>
 #include <kernel/msg_param.h>
 #include <kernel/pseudo_ta.h>
 #include <kernel/user_ta.h>
@@ -11,6 +11,7 @@
 #include <util.h>
 #include <io.h>
 #include <trace.h>
+#include <crypto/secdeep_fpe.h>
 
 static TEE_Result open_session(uint32_t param_types __unused,
 			       TEE_Param params[TEE_NUM_PARAMS] __unused,
@@ -28,12 +29,74 @@ static TEE_Result open_session(uint32_t param_types __unused,
 	return TEE_SUCCESS;
 }
 
+static TEE_Result sanitize_data(void* data, uint32_t size, void* output) {
+	unsigned char result[size];
+
+	FPE_encrypt(data, result, size);
+	memcpy(output, result, size);
+	if(size == sizeof(uint32_t)) {
+		int key = ((int *)data)[0];
+		int value = ((int *)output)[0];
+		hash_add_pair(key, value);
+	}
+	return TEE_SUCCESS;
+}
+
+static TEE_Result desanitize_data(void* data, uint32_t size, void* output) {
+	unsigned char result[size];
+
+	if(size == sizeof(uint32_t)) {
+		int key = ((int *)data)[0];
+		int value = 0;
+		if(!hash_get_value(key, &value)) {
+			memcpy(output, &value, size);
+			return TEE_SUCCESS;
+		}
+	}
+
+	FPE_decrypt(result, data, size);
+	memcpy(output, result, size);
+	return TEE_SUCCESS;
+}
+
 static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 				 uint32_t param_types,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
   DMSG("Mali driver invoke command called.");
 	switch (cmd_id) {
+
+	case SANITIZE_DATA:
+	{
+		unsigned char* temp_buf = (unsigned char *)malloc(params[0].memref.size);
+		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+  						   TEE_PARAM_TYPE_MEMREF_OUTPUT,
+  						   TEE_PARAM_TYPE_NONE,
+  						   TEE_PARAM_TYPE_NONE);
+		memcpy(temp_buf, params[0].memref.buffer, params[0].memref.size);
+    if (param_types != exp_param_types){
+      EMSG("Secdeep encryption: unexpected read param type.");
+      return TEE_ERROR_BAD_PARAMETERS;
+    }
+		sanitize_data(temp_buf, params[0].memref.size, params[1].memref.buffer);
+		return TEE_SUCCESS;
+	}
+
+	case DESANITIZE_DATA:
+	{
+		unsigned char* temp_buf = (unsigned char *)malloc(params[0].memref.size);
+		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+  						   TEE_PARAM_TYPE_MEMREF_OUTPUT,
+  						   TEE_PARAM_TYPE_NONE,
+  						   TEE_PARAM_TYPE_NONE);
+		memcpy(temp_buf, params[0].memref.buffer, params[0].memref.size);
+    if (param_types != exp_param_types){
+      EMSG("Secdeep encryption: unexpected read param type.");
+      return TEE_ERROR_BAD_PARAMETERS;
+    }
+		desanitize_data(temp_buf, params[0].memref.size, params[1].memref.buffer);
+		return TEE_SUCCESS;
+	}
 
 	case READ_COMMANDS:
 	{
@@ -56,6 +119,7 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
     params[1].value.b = returned_value;
 		return TEE_SUCCESS;
 	}
+
 	case WRITE_COMMANDS:
 	{
     uint32_t* mem_address = (uint32_t*)params[0].memref.buffer;
@@ -78,7 +142,8 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
     }
     return TEE_SUCCESS;
 	}
-  case JD_SUBMIT:
+
+	case JD_SUBMIT:
 	{
 		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
 								 TEE_PARAM_TYPE_MEMREF_OUTPUT,
@@ -126,7 +191,7 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 	return TEE_ERROR_NOT_IMPLEMENTED;
 }
 
-pseudo_ta_register(.uuid = MALI_UUID, .name = TA_NAME,
+pseudo_ta_register(.uuid = SECDEEP_UUID, .name = TA_NAME,
 		   .flags = PTA_DEFAULT_FLAGS,
        .open_session_entry_point = open_session,
 		   .invoke_command_entry_point = invoke_command);

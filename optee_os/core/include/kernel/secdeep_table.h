@@ -1,4 +1,7 @@
 // The secdeep table related implementations.
+#ifndef __SECDEEP_TABLE
+#define __SECDEEP_TABLE
+
 #include <stdlib.h>
 #include <trace.h>
 #include <assert.h>
@@ -6,6 +9,7 @@
 #include <keep.h>
 #include <kernel/asan.h>
 #include <kernel/panic.h>
+#include <kernel/thread.h>
 #include <string.h>
 #include <types_ext.h>
 #include <util.h>
@@ -19,12 +23,19 @@ typedef struct val {
 #define HASH2_SIZE  100000
 #define HASH_MAX    100000
 
+// The following two are for evaluation purposes
+#define MAX_SECURE_SIZE 10*1024*1024
+#define MAX_TABLE_SIZE  MAX_SECURE_SIZE/8
+
 int* hashL1[HASH1_SIZE];
 char initialized[HASH1_SIZE];
-char entry = 0;
+extern char entry;
+extern uint32_t table_size;
 
 void secdeep_hash_init(void);
 int add_entry(int key);
 int hash_get_value(int key, int* value);
 int hash_add_pair(int key, int value);
 int secdeep_hash_delete(void);
+
+#endif
