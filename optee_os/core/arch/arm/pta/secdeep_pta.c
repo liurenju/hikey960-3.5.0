@@ -17,44 +17,51 @@ static TEE_Result open_session(uint32_t param_types __unused,
 			       TEE_Param params[TEE_NUM_PARAMS] __unused,
 			       void **sess_ctx __unused)
 {
-	struct tee_ta_session *s;
-
-	/* Check that we're called from a user TA */
-	s = tee_ta_get_calling_session();
-	if (!s)
-		return TEE_ERROR_ACCESS_DENIED;
-	if (!is_user_ta_ctx(s->ctx))
-		return TEE_ERROR_ACCESS_DENIED;
-
+	// struct tee_ta_session *s;
+	DMSG("Opening the session.");
 	return TEE_SUCCESS;
 }
 
-static TEE_Result sanitize_data(void* data, uint32_t size, void* output) {
+static TEE_Result sanitize_data(void* input, uint32_t size, void* output, uint32_t unit_size) {
 	unsigned char result[size];
+	unsigned char data[size];
+	memcpy(data, input, size);
 
-	FPE_encrypt(data, result, size);
-	memcpy(output, result, size);
-	if(size == sizeof(uint32_t)) {
-		int key = ((int *)data)[0];
-		int value = ((int *)output)[0];
-		hash_add_pair(key, value);
-	}
-	return TEE_SUCCESS;
-}
-
-static TEE_Result desanitize_data(void* data, uint32_t size, void* output) {
-	unsigned char result[size];
-
-	if(size == sizeof(uint32_t)) {
-		int key = ((int *)data)[0];
-		int value = 0;
-		if(!hash_get_value(key, &value)) {
-			memcpy(output, &value, size);
-			return TEE_SUCCESS;
+	DMSG("Sanitizing data.");
+	for(uint32_t i = 0; i < size / unit_size; i++){
+		DMSG("For loop.");
+		DMSG("unit size: %d", unit_size);
+		FPE_encrypt(data + i * unit_size, result + i * unit_size, unit_size);
+		DMSG("For loop break 2.");
+		if(unit_size == sizeof(uint32_t)) {
+			int key = ((int *)data)[i];
+			int value = ((int *)output)[i];
+			DMSG("RL-- key: %d, value: %d", key, value);
+			hash_add_pair(key, value);
 		}
 	}
+	memcpy(output, result, size);
+	return TEE_SUCCESS;
+}
 
-	FPE_decrypt(result, data, size);
+static TEE_Result desanitize_data(void* input, uint32_t size, void* output, uint32_t unit_size) {
+	unsigned char result[size];
+	unsigned char data[size];
+	memcpy(data, input, size);
+
+	DMSG("Desanitizing data.");
+	for(uint32_t i = 0; i < size / unit_size; i++) {
+		if(size == sizeof(uint32_t)) {
+				int key = ((int *)data)[i];
+				int value = 0;
+				if(!hash_get_value(key, &value)) {
+					memcpy(result + i * unit_size, &value, unit_size);
+					continue;
+				}
+			}
+
+		FPE_decrypt(result + i * unit_size, data + i * unit_size, unit_size);
+	}
 	memcpy(output, result, size);
 	return TEE_SUCCESS;
 }
@@ -63,7 +70,6 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 				 uint32_t param_types,
 				 TEE_Param params[TEE_NUM_PARAMS])
 {
-  DMSG("Mali driver invoke command called.");
 	switch (cmd_id) {
 
 	case SANITIZE_DATA:
@@ -71,14 +77,15 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 		unsigned char* temp_buf = (unsigned char *)malloc(params[0].memref.size);
 		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
   						   TEE_PARAM_TYPE_MEMREF_OUTPUT,
-  						   TEE_PARAM_TYPE_NONE,
+  						   TEE_PARAM_TYPE_VALUE_INOUT,
   						   TEE_PARAM_TYPE_NONE);
+		uint32_t unit_size = params[2].value.a;
 		memcpy(temp_buf, params[0].memref.buffer, params[0].memref.size);
     if (param_types != exp_param_types){
       EMSG("Secdeep encryption: unexpected read param type.");
       return TEE_ERROR_BAD_PARAMETERS;
     }
-		sanitize_data(temp_buf, params[0].memref.size, params[1].memref.buffer);
+		sanitize_data(temp_buf, params[0].memref.size, params[1].memref.buffer, unit_size);
 		return TEE_SUCCESS;
 	}
 
@@ -87,14 +94,15 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 		unsigned char* temp_buf = (unsigned char *)malloc(params[0].memref.size);
 		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
   						   TEE_PARAM_TYPE_MEMREF_OUTPUT,
-  						   TEE_PARAM_TYPE_NONE,
+  						   TEE_PARAM_TYPE_VALUE_INOUT,
   						   TEE_PARAM_TYPE_NONE);
 		memcpy(temp_buf, params[0].memref.buffer, params[0].memref.size);
     if (param_types != exp_param_types){
       EMSG("Secdeep encryption: unexpected read param type.");
       return TEE_ERROR_BAD_PARAMETERS;
     }
-		desanitize_data(temp_buf, params[0].memref.size, params[1].memref.buffer);
+		uint32_t unit_size = params[2].value.a;
+		desanitize_data(temp_buf, params[0].memref.size, params[1].memref.buffer, unit_size);
 		return TEE_SUCCESS;
 	}
 
