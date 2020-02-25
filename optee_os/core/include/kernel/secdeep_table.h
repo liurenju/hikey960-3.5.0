@@ -27,15 +27,15 @@ typedef struct val {
 #define MAX_SECURE_SIZE 10*1024*1024
 #define MAX_TABLE_SIZE  MAX_SECURE_SIZE/8
 
-int* hashL1[HASH1_SIZE];
+uint32_t* hashL1[HASH1_SIZE];
 char initialized[HASH1_SIZE];
 extern char entry;
 extern uint32_t table_size;
 
 void secdeep_hash_init(void);
-int add_entry(int key);
-int hash_get_value(int key, int* value);
-int hash_add_pair(int key, int value);
-int secdeep_hash_delete(void);
+uint32_t add_entry(uint32_t key);
+uint32_t hash_get_value(uint32_t key, uint32_t* value);
+uint32_t hash_add_pair(uint32_t key, uint32_t value);
+uint32_t secdeep_hash_delete(void);
 
 #endif

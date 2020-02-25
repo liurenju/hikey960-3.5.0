@@ -29,14 +29,12 @@ static TEE_Result sanitize_data(void* input, uint32_t size, void* output, uint32
 
 	DMSG("Sanitizing data.");
 	for(uint32_t i = 0; i < size / unit_size; i++){
-		DMSG("For loop.");
 		DMSG("unit size: %d", unit_size);
 		FPE_encrypt(data + i * unit_size, result + i * unit_size, unit_size);
-		DMSG("For loop break 2.");
 		if(unit_size == sizeof(uint32_t)) {
-			int key = ((int *)data)[i];
-			int value = ((int *)output)[i];
-			DMSG("RL-- key: %d, value: %d", key, value);
+			uint32_t key = ((uint32_t *)data)[i];
+			uint32_t value = ((uint32_t *)output)[i];
+			DMSG("RL-- key: %u, value: %u", key, value);
 			hash_add_pair(key, value);
 		}
 	}
@@ -52,8 +50,8 @@ static TEE_Result desanitize_data(void* input, uint32_t size, void* output, uint
 	DMSG("Desanitizing data.");
 	for(uint32_t i = 0; i < size / unit_size; i++) {
 		if(size == sizeof(uint32_t)) {
-				int key = ((int *)data)[i];
-				int value = 0;
+				uint32_t key = ((uint32_t *)data)[i];
+				uint32_t value = 0;
 				if(!hash_get_value(key, &value)) {
 					memcpy(result + i * unit_size, &value, unit_size);
 					continue;

@@ -25,7 +25,8 @@ int init_FPE_state(symmetric_CTR *ctr) {
   if (ctr_start(cipher_idx, SECDEEP_IV, SECDEEP_KEY, SECDEEP_KEY_LEN, 0, CTR_COUNTER_BIG_ENDIAN, ctr) == CRYPT_OK) {
     return TEE_SUCCESS;
   }
-  else {
+  else
+  {
     panic("---RL: CTR starts failed.");
     return TEE_ERROR_BAD_STATE;
   }
@@ -36,20 +37,17 @@ int init_FPE_state(symmetric_CTR *ctr) {
 void FPE_encrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int inlen)
 {
   symmetric_CTR ctr;
-  EMSG("RL: I am here!");
   memset(ciphered, 0, inlen);
-  EMSG("RL: I am here!2");
   if (init_FPE_state(&ctr) != TEE_SUCCESS) {
-    EMSG("---RL: init aes ctr failed.");
     panic("---RL: init aes ctr failed.");
     return;
   }
 
   if(ctr_encrypt(plaintext, ciphered, inlen, &ctr) != CRYPT_OK) {
-    EMSG("---RL: encrypt aes ctr failed.");
     panic("---RL: encrypt aes ctr failed.");
   }
-  EMSG("RL: I am here!3");
+  // DMSG("RL: Plaintext - %u, ciphered - %u\n", ((uint32_t *)plaintext)[0], ((uint32_t *)ciphered)[0]);
+  // EMSG("RL: I am here!3");
 
   //
   // WARNING!!!!
@@ -57,17 +55,23 @@ void FPE_encrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int
   // for evaluation purposes.
   //
 
-// #if defined(CFG_TEST_SECDEEP_FPE)
-//   unsigned char test_plaintext[inlen];
-//   unsigned char test_ciphered[inlen];
-//   memcpy(test_ciphered, ciphered, inlen);
-//   FPE_decrypt(test_plaintext, test_ciphered, inlen);
-//   for(unsigned int i = 0; i < inlen; i++) {
-//     if(plaintext[i] != test_plaintext[i]){
-//       EMSG("Cipher failed.");
-//     }
-//   }
-// #endif
+#if defined(CFG_TEST_SECDEEP_FPE)
+  unsigned char test_plaintext[inlen];
+  unsigned char test_ciphered[inlen];
+  memcpy(test_ciphered, ciphered, inlen);
+  if (init_FPE_state(&ctr) != TEE_SUCCESS) {
+    panic("---RL: init aes ctr failed.");
+    return;
+  }
+  if(ctr_decrypt(test_ciphered, test_plaintext, inlen, &ctr) != CRYPT_OK) {
+    panic("---RL: encrypt aes ctr failed.");
+  }
+  for(unsigned int i = 0; i < inlen; i++) {
+    if(plaintext[i] != test_plaintext[i]){
+      panic("Cipher failed.");
+    }
+  }
+#endif
 
 }
 
@@ -94,7 +98,13 @@ void FPE_decrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int
   unsigned char test_plaintext[inlen];
   unsigned char test_ciphered[inlen];
   memcpy(test_plaintext, plaintext, inlen);
-  FPE_encrypt(test_plaintext, test_ciphered, inlen);
+  if (init_FPE_state(&ctr) != TEE_SUCCESS) {
+    panic("---RL: init aes ctr failed.");
+    return;
+  }
+  if(ctr_encrypt(test_plaintext, test_ciphered, inlen, &ctr) != CRYPT_OK) {
+    panic("---RL: encrypt aes ctr failed.");
+  }
   for(unsigned int i = 0; i < inlen; i++) {
     assert(test_ciphered[i] == test_ciphered[i]);
   }
