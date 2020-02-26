@@ -20,16 +20,22 @@ uint32_t add_entry(uint32_t key) {
 
   uint32_t index = key / HASH1_SIZE;
   if (index >= HASH_MAX) {
-    DMSG("Max hash value exceeded.");
+    // DMSG("Max hash value exceeded.");
     return 1;
   }
 
   if(initialized[index]) {
-    DMSG("This entry has been initialized.");
+    // DMSG("This entry has been initialized.");
     return 1;
   }
+
   initialized[index] = 1;
   hashL1[index] = (uint32_t *)malloc(sizeof(uint32_t) * HASH2_SIZE);
+
+  if(!hashL1[index]) {
+    DMSG("Cao ni ma. allocating memory failed. ri!");
+    return 1;
+  }
   for(uint32_t i = 0; i < HASH2_SIZE; i++) {
     hashL1[index][i] = 0;
   }
@@ -39,12 +45,12 @@ uint32_t add_entry(uint32_t key) {
 uint32_t hash_get_value(uint32_t key, uint32_t* value) {
   uint32_t index = key / HASH1_SIZE;
   if (index >= HASH_MAX) {
-    DMSG("Cannot get the hash value. Too large!");
+    // DMSG("Cannot get the hash value. Too large!");
     return 1;
   }
 
   if (!initialized[index]) {
-    DMSG("Cannot get the hash value. Too large!");
+    // DMSG("Cannot get the hash value. Too large!");
     return 1;
   }
 
@@ -63,13 +69,15 @@ uint32_t hash_add_pair(uint32_t key, uint32_t value) {
   }
 
   if (index >= HASH_MAX) {
-    DMSG("Max hash value exceeded.");
+    // DMSG("Max hash value exceeded.");
     return 1;
   }
 
-  EMSG("Renju has reached here. index: %u", index);
-  add_entry(key);
-  EMSG("Renju has reached here1.");
+  if(!add_entry(key)){
+    // DMSG("adding entry failed.");
+    return 1;
+  }
+
   uint32_t entry_l2 = key % HASH2_SIZE;
   if(hashL1[index][entry_l2]) {
     if (hashL1[index][entry_l2] != value) {
@@ -78,9 +86,8 @@ uint32_t hash_add_pair(uint32_t key, uint32_t value) {
     }
     return 0;
   }
-  EMSG("Renju has reached here2.");
+
   hashL1[index][entry_l2] = value;
-  EMSG("Renju has reached here3.");
   return 0;
 }
 

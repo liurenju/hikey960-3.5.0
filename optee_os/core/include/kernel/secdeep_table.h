@@ -19,9 +19,9 @@ typedef struct val {
   char length;
 } VAL;
 
-#define HASH1_SIZE  100000
-#define HASH2_SIZE  100000
-#define HASH_MAX    100000
+#define HASH1_SIZE  10000
+#define HASH2_SIZE  10000
+#define HASH_MAX    10000
 
 // The following two are for evaluation purposes
 #define MAX_SECURE_SIZE 10*1024*1024
