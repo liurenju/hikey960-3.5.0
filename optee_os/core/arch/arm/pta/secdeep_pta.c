@@ -18,7 +18,7 @@ static TEE_Result open_session(uint32_t param_types __unused,
 			       void **sess_ctx __unused)
 {
 	// struct tee_ta_session *s;
-	DMSG("Opening the session.");
+	// DMSG("Opening the session.");
 	return TEE_SUCCESS;
 }
 
@@ -27,7 +27,7 @@ static TEE_Result sanitize_data(void* input, uint32_t size, void* output, uint32
 	// unsigned char data[size];
 	// memcpy(data, input, size);
 
-	DMSG("Sanitizing data.");
+	// DMSG("Sanitizing data.");
 	for(uint32_t i = 0; i < size / unit_size; i++){
 		// DMSG("unit size: %d", unit_size);
 		FPE_encrypt((unsigned char*)input + i * unit_size, (unsigned char*)output + i * unit_size, unit_size);
@@ -47,7 +47,7 @@ static TEE_Result desanitize_data(void* input, uint32_t size, void* output, uint
 	// unsigned char data[size];
 	// memcpy(data, input, size);
 
-	DMSG("Desanitizing data.");
+	// DMSG("Desanitizing data.");
 	for(uint32_t i = 0; i < size / unit_size; i++) {
 		if(unit_size != sizeof(uint32_t)) EMSG("Fuck! size has some issues.");
 		if(unit_size == sizeof(uint32_t)) {
@@ -55,7 +55,7 @@ static TEE_Result desanitize_data(void* input, uint32_t size, void* output, uint
 				uint32_t value = 0;
 				if(!hash_get_value(key, &value)) {
 					memcpy((unsigned char*)output + i * unit_size, &value, unit_size);
-					DMSG("RL-- key: %u, value: %u", key, value);
+					// DMSG("RL-- key: %u, value: %u", key, value);
 					continue;
 				}
 				// DMSG("RL2-- key: %u, value: %u", key, value);
@@ -76,6 +76,13 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
 	case SANITIZE_DATA:
 	{
 		unsigned char* temp_buf = (unsigned char *)malloc(params[0].memref.size);
+		if(!temp_buf) {
+			secdeep_hash_delete();
+			temp_buf = (unsigned char *)malloc(params[0].memref.size);
+		}
+		if(!temp_buf) {
+			return TEE_ERROR_RESET_TEE;
+		}
 		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
   						   TEE_PARAM_TYPE_MEMREF_OUTPUT,
   						   TEE_PARAM_TYPE_VALUE_INOUT,
@@ -87,12 +94,21 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
       return TEE_ERROR_BAD_PARAMETERS;
     }
 		sanitize_data(temp_buf, params[0].memref.size, params[1].memref.buffer, unit_size);
+		free(temp_buf);
 		return TEE_SUCCESS;
 	}
 
 	case DESANITIZE_DATA:
 	{
 		unsigned char* temp_buf = (unsigned char *)malloc(params[0].memref.size);
+		if(!temp_buf) {
+			secdeep_hash_delete();
+			temp_buf = (unsigned char *)malloc(params[0].memref.size);
+		}
+		if(!temp_buf) {
+			return TEE_ERROR_RESET_TEE;
+		}
+
 		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
   						   TEE_PARAM_TYPE_MEMREF_OUTPUT,
   						   TEE_PARAM_TYPE_VALUE_INOUT,
@@ -104,6 +120,7 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
     }
 		uint32_t unit_size = params[2].value.a;
 		desanitize_data(temp_buf, params[0].memref.size, params[1].memref.buffer, unit_size);
+		free(temp_buf);
 		return TEE_SUCCESS;
 	}
 

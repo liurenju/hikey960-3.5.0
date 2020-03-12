@@ -26,16 +26,17 @@ uint32_t add_entry(uint32_t key) {
 
   if(initialized[index]) {
     // DMSG("This entry has been initialized.");
+    return 0;
+  }
+
+  hashL1[index] = (uint32_t *)malloc(sizeof(uint32_t) * HASH2_SIZE);
+
+  if(!hashL1[index]) {
+    // DMSG("Cao ni ma. allocating memory failed. ri!");
     return 1;
   }
 
   initialized[index] = 1;
-  hashL1[index] = (uint32_t *)malloc(sizeof(uint32_t) * HASH2_SIZE);
-
-  if(!hashL1[index]) {
-    DMSG("Cao ni ma. allocating memory failed. ri!");
-    return 1;
-  }
   for(uint32_t i = 0; i < HASH2_SIZE; i++) {
     hashL1[index][i] = 0;
   }
@@ -73,7 +74,7 @@ uint32_t hash_add_pair(uint32_t key, uint32_t value) {
     return 1;
   }
 
-  if(!add_entry(key)){
+  if(add_entry(key)){
     // DMSG("adding entry failed.");
     return 1;
   }
@@ -94,8 +95,12 @@ uint32_t hash_add_pair(uint32_t key, uint32_t value) {
 uint32_t secdeep_hash_delete(void) {
   for(uint32_t i = 0; i < HASH1_SIZE; i++) {
     initialized[i] = 0;
+    if(hashL1[i]) {
+      free(hashL1[i]);
+    }
   }
   entry = 0;
   table_size = 0;
+
   return 0;
 }
