@@ -13,6 +13,11 @@
 #include <trace.h>
 #include <crypto/secdeep_fpe.h>
 
+#define MODEL_INTEGRITY	7
+
+#include <crypto/crypto.h>
+#include <crypto/crypto_impl.h>
+
 static TEE_Result open_session(uint32_t param_types __unused,
 			       TEE_Param params[TEE_NUM_PARAMS] __unused,
 			       void **sess_ctx __unused)
@@ -64,6 +69,21 @@ static TEE_Result desanitize_data(void* input, uint32_t size, void* output, uint
 		FPE_decrypt((unsigned char*)output + i * unit_size, (unsigned char*)input + i * unit_size, unit_size);
 	}
 	// memcpy(output, result, size);
+	return TEE_SUCCESS;
+}
+
+static TEE_Result model_integrity(const uint8_t* data, uint32_t data_size)
+{
+	hash_state hs;
+	uint8_t digest[TEE_SHA256_HASH_SIZE];
+
+	if (sha256_init(&hs) != CRYPT_OK)
+		return TEE_ERROR_GENERIC;
+	if (sha256_process(&hs, data, data_size) != CRYPT_OK)
+		return TEE_ERROR_GENERIC;
+	if (sha256_done(&hs, digest) != CRYPT_OK)
+		return TEE_ERROR_GENERIC;
+
 	return TEE_SUCCESS;
 }
 
@@ -120,6 +140,32 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
     }
 		uint32_t unit_size = params[2].value.a;
 		desanitize_data(temp_buf, params[0].memref.size, params[1].memref.buffer, unit_size);
+		free(temp_buf);
+		return TEE_SUCCESS;
+	}
+
+	case MODEL_INTEGRITY:
+	{
+		unsigned char* temp_buf = (unsigned char *)malloc(params[0].memref.size);
+		if(!temp_buf) {
+			secdeep_hash_delete();
+			temp_buf = (unsigned char *)malloc(params[0].memref.size);
+		}
+		if(!temp_buf) {
+			return TEE_ERROR_RESET_TEE;
+		}
+
+		uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+  						   TEE_PARAM_TYPE_NONE,
+  						   TEE_PARAM_TYPE_NONE,
+  						   TEE_PARAM_TYPE_NONE);
+		memcpy(temp_buf, params[0].memref.buffer, params[0].memref.size);
+    if (param_types != exp_param_types){
+      EMSG("Secdeep encryption: unexpected read param type.");
+      return TEE_ERROR_BAD_PARAMETERS;
+    }
+
+		model_integrity(temp_buf, params[0].memref.size);
 		free(temp_buf);
 		return TEE_SUCCESS;
 	}
