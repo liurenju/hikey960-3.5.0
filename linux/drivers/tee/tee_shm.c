@@ -303,6 +303,7 @@ struct tee_shm *tee_shm_register(struct tee_context *ctx, unsigned long addr,
 	mutex_unlock(&teedev->mutex);
 
 	if (shm->id < 0) {
+    // printk(KERN_EMERG "RL: idr_alloc error: %d\n", shm->id);
 		ret = ERR_PTR(shm->id);
 		goto err;
 	}
@@ -310,6 +311,7 @@ struct tee_shm *tee_shm_register(struct tee_context *ctx, unsigned long addr,
 	rc = teedev->desc->ops->shm_register(ctx, shm, shm->pages,
 					     shm->num_pages, start);
 	if (rc) {
+    // printk(KERN_EMERG "RL: shm_register error: %d\n", rc);
 		ret = ERR_PTR(rc);
 		goto err;
 	}
@@ -326,6 +328,7 @@ struct tee_shm *tee_shm_register(struct tee_context *ctx, unsigned long addr,
 		if (IS_ERR(shm->dmabuf)) {
 			ret = ERR_CAST(shm->dmabuf);
 			teedev->desc->ops->shm_unregister(ctx, shm);
+      // printk(KERN_EMERG "RL: dma_buf_export\n");
 			goto err;
 		}
 	}
@@ -468,8 +471,9 @@ int tee_shm_get_fd(struct tee_shm *shm)
 
 	get_dma_buf(shm->dmabuf);
 	fd = dma_buf_fd(shm->dmabuf, O_CLOEXEC);
-	if (fd < 0)
+	if (fd < 0){
 		dma_buf_put(shm->dmabuf);
+  }
 	return fd;
 }
 

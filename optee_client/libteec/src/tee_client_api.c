@@ -128,8 +128,10 @@ static int teec_shm_register(int fd, void *buf, size_t size, int *id)
 	data.addr = (uintptr_t)buf;
 	data.length = size;
 	shm_fd = ioctl(fd, TEE_IOC_SHM_REGISTER, &data);
-	if (shm_fd < 0)
+	if (shm_fd < 0) {
+		EMSG("shm_fd fail: %d", shm_fd);
 		return -1;
+	}
 	*id = data.id;
 	return shm_fd;
 }
@@ -461,6 +463,7 @@ static TEEC_Result ioctl_errno_to_res(int err)
 {
 	switch (err) {
 	case ENOMEM:
+		EMSG("Out fail 5");
 		return TEEC_ERROR_OUT_OF_MEMORY;
 	default:
 		return TEEC_ERROR_GENERIC;
@@ -613,6 +616,7 @@ TEEC_Result TEEC_InvokeCommand(TEEC_Session *session, uint32_t cmd_id,
 
 	res = teec_pre_process_operation(session->ctx, operation, params, shm);
 	if (res != TEEC_SUCCESS) {
+		EMSG("Failed invoken command pre process operation.");
 		eorig = TEEC_ORIGIN_API;
 		goto out_free_temp_refs;
 	}
@@ -632,6 +636,7 @@ TEEC_Result TEEC_InvokeCommand(TEEC_Session *session, uint32_t cmd_id,
 	bm_timestamp();
 
 out_free_temp_refs:
+	// DMSG("RL: releasing shm");
 	teec_free_temp_refs(operation, shm);
 out:
 	if (error_origin)
@@ -679,20 +684,25 @@ TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context *ctx, TEEC_SharedMemory *shm)
 		s = 8;
 	if (ctx->reg_mem) {
 		fd = teec_shm_register(ctx->fd, shm->buffer, s, &shm->id);
-		if (fd < 0)
+		if (fd < 0) {
+			EMSG("Out fail 6");
 			return TEEC_ERROR_OUT_OF_MEMORY;
+		}
 		shm->registered_fd = fd;
 		shm->shadow_buffer = NULL;
 	} else {
 		fd = teec_shm_alloc(ctx->fd, s, &shm->id);
-		if (fd < 0)
+		if (fd < 0) {
+			EMSG("Out fail 7");
 			return TEEC_ERROR_OUT_OF_MEMORY;
+		}
 
 		shm->shadow_buffer = mmap(NULL, s, PROT_READ | PROT_WRITE,
 					  MAP_SHARED, fd, 0);
 		close(fd);
 		if (shm->shadow_buffer == (void *)MAP_FAILED) {
 			shm->id = -1;
+			EMSG("Out fail 8");
 			return TEEC_ERROR_OUT_OF_MEMORY;
 		}
 		shm->registered_fd = -1;
@@ -749,25 +759,32 @@ TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context *ctx, TEEC_SharedMemory *shm)
 	if (ctx->reg_mem) {
 		shm->buffer = malloc(s);
 		if (!shm->buffer)
+		{
+			EMSG("Out fail 1");
 			return TEEC_ERROR_OUT_OF_MEMORY;
+		}
 
 		fd = teec_shm_register(ctx->fd, shm->buffer, s, &shm->id);
 		if (fd < 0) {
 			free(shm->buffer);
 			shm->buffer = NULL;
+			EMSG("Out fail 2");
 			return TEEC_ERROR_OUT_OF_MEMORY;
 		}
 		shm->registered_fd = fd;
 	} else {
 		fd = teec_shm_alloc(ctx->fd, s, &shm->id);
-		if (fd < 0)
+		if (fd < 0) {
+			EMSG("Out fail 3");
 			return TEEC_ERROR_OUT_OF_MEMORY;
+		}
 
 		shm->buffer = mmap(NULL, s, PROT_READ | PROT_WRITE,
 				   MAP_SHARED, fd, 0);
 		close(fd);
 		if (shm->buffer == (void *)MAP_FAILED) {
 			shm->id = -1;
+			EMSG("Out fail 4");
 			return TEEC_ERROR_OUT_OF_MEMORY;
 		}
 		shm->registered_fd = -1;

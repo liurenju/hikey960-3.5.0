@@ -23,7 +23,7 @@
 extern int cur_size;
 
 int init_FPE_state(symmetric_CTR *ctr);
-void FPE_encrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int inlen);
-void FPE_decrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int inlen);
+void FPE_encrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int inlen, symmetric_CTR *ctr);
+void FPE_decrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int inlen, symmetric_CTR *ctr);
 
 #endif

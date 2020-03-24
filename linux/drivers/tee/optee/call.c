@@ -585,12 +585,16 @@ int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 	phys_addr_t msg_parg;
 	int rc;
 
-	if (!num_pages)
+	if (!num_pages) {
+		// printk(KERN_EMERG "RL: num_pages is 0\n\n");
 		return -EINVAL;
+	}
 
 	rc = check_mem_type(start, num_pages);
-	if (rc)
+	if (rc) {
+		// printk(KERN_EMERG "RL: check_mem_type is %d\n\n", rc);
 		return rc;
+	}
 
 	pages_list = optee_allocate_pages_list(num_pages);
 	if (!pages_list)
@@ -599,6 +603,7 @@ int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 	shm_arg = get_msg_arg(ctx, 1, &msg_arg, &msg_parg);
 	if (IS_ERR(shm_arg)) {
 		rc = PTR_ERR(shm_arg);
+		// printk(KERN_EMERG "RL: get_msg_arg is %d\n\n", rc);
 		goto out;
 	}
 
@@ -619,7 +624,11 @@ int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
 
 	if (optee_do_call_with_arg(ctx, msg_parg) ||
 	    msg_arg->ret != TEEC_SUCCESS)
+	{
+		// printk(KERN_EMERG "RL: msg_arg ret: %d\n\n", msg_arg->ret);
+		// printk(KERN_EMERG "RL: optee_do_call_with_arg\n\n");
 		rc = -EINVAL;
+	}
 
 	tee_shm_free(shm_arg);
 out:

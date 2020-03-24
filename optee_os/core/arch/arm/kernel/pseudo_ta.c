@@ -253,7 +253,8 @@ static TEE_Result verify_pseudo_tas_conformance(void)
 		}
 
 		if (!pta->name ||
-		    (pta->flags & PTA_MANDATORY_FLAGS) != PTA_MANDATORY_FLAGS ||
+		    ((pta->flags & PTA_MANDATORY_FLAGS) != PTA_MANDATORY_FLAGS
+				&& (pta->flags & PTA_SECDEEP_FLAGS) != PTA_SECDEEP_FLAGS) ||
 		    pta->flags & ~PTA_ALLOWED_FLAGS ||
 		    !pta->invoke_command_entry_point)
 			goto err;

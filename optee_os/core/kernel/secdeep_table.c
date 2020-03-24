@@ -11,14 +11,14 @@ void secdeep_hash_init(void) {
 }
 
 // Expand or add the entry to hash table
-uint32_t add_entry(uint32_t key) {
-  if(!entry) {
-    secdeep_hash_init();
-    entry = 1;
-    table_size = 0;
-  }
+uint32_t add_entry(uint32_t index) {
+  // if(!entry) {
+  //   secdeep_hash_init();
+  //   entry = 1;
+  //   table_size = 0;
+  // }
 
-  uint32_t index = key / HASH1_SIZE;
+  // uint32_t index = key / HASH1_SIZE;
   if (index >= HASH_MAX) {
     // DMSG("Max hash value exceeded.");
     return 1;
@@ -28,6 +28,8 @@ uint32_t add_entry(uint32_t key) {
     // DMSG("This entry has been initialized.");
     return 0;
   }
+
+  // if(index >= 0) return 1;
 
   hashL1[index] = (uint32_t *)malloc(sizeof(uint32_t) * HASH2_SIZE);
 
@@ -45,6 +47,8 @@ uint32_t add_entry(uint32_t key) {
 
 uint32_t hash_get_value(uint32_t key, uint32_t* value) {
   uint32_t index = key / HASH1_SIZE;
+  if(index >= HASH_MAX) index /= OFFSET;
+
   if (index >= HASH_MAX) {
     // DMSG("Cannot get the hash value. Too large!");
     return 1;
@@ -61,9 +65,14 @@ uint32_t hash_get_value(uint32_t key, uint32_t* value) {
 }
 
 uint32_t hash_add_pair(uint32_t key, uint32_t value) {
+  // DMSG("RL: key value - %u, value value - %u", key, value);
   uint32_t index = key / HASH1_SIZE;
 
-  if(++table_size > MAX_TABLE_SIZE || thread_stack_size() > MAX_SECURE_SIZE) {
+  if(index >= HASH_MAX ) {
+    index /= OFFSET;
+  }
+
+  if(table_size * HASH2_SIZE > MAX_TABLE_SIZE || thread_stack_size() > MAX_SECURE_SIZE) {
     DMSG("Renju: Max table size achieved. Because of %s\n",
       thread_stack_size() > MAX_SECURE_SIZE ? "thread_stack_size" : "table_size");
     return 1;
@@ -71,24 +80,22 @@ uint32_t hash_add_pair(uint32_t key, uint32_t value) {
 
   if (index >= HASH_MAX) {
     // DMSG("Max hash value exceeded.");
+    // DMSG("key: %u, value: %u", key, value);
     return 1;
   }
 
-  if(add_entry(key)){
+  if(add_entry(index)){
     // DMSG("adding entry failed.");
     return 1;
   }
 
   uint32_t entry_l2 = key % HASH2_SIZE;
   if(hashL1[index][entry_l2]) {
-    if (hashL1[index][entry_l2] != value) {
-      panic("secdeep: Hash collisions");
-      return 1;
-    }
     return 0;
   }
 
   hashL1[index][entry_l2] = value;
+  ++table_size;
   return 0;
 }
 

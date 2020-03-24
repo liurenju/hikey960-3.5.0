@@ -20,11 +20,12 @@ typedef struct val {
 } VAL;
 
 #define HASH1_SIZE  10000
-#define HASH2_SIZE  10000
+#define HASH2_SIZE  1000
 #define HASH_MAX    10000
+#define OFFSET      10000
 
 // The following two are for evaluation purposes
-#define MAX_SECURE_SIZE 10*1024*1024
+#define MAX_SECURE_SIZE 1*1024*1024
 #define MAX_TABLE_SIZE  MAX_SECURE_SIZE/8
 
 uint32_t* hashL1[HASH1_SIZE];

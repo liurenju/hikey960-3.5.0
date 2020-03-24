@@ -177,7 +177,7 @@
 
 #ifndef MAX_XLAT_TABLES
 #ifndef CFG_VIRTUALIZATION
-#define MAX_XLAT_TABLES		5
+#define MAX_XLAT_TABLES		12
 #else  /* CFG_VIRTUALIZATION*/
 #define MAX_XLAT_TABLES		8
 #endif

@@ -13,6 +13,8 @@
 #include <user_ta_header.h>
 #include <util.h>
 
+#define PTA_SECDEEP_FLAGS	TA_FLAG_MULTI_SESSION
+
 #define PTA_MANDATORY_FLAGS	(TA_FLAG_SINGLE_INSTANCE | \
 				TA_FLAG_MULTI_SESSION | \
 				TA_FLAG_INSTANCE_KEEP_ALIVE)
@@ -61,4 +63,3 @@ TEE_Result tee_ta_init_pseudo_ta_session(const TEE_UUID *uuid,
 			struct tee_ta_session *s);
 
 #endif /* KERNEL_PSEUDO_TA_H */
-

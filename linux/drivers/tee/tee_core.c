@@ -147,8 +147,11 @@ static int tee_ioctl_shm_alloc(struct tee_context *ctx,
 		return -EINVAL;
 
 	shm = tee_shm_alloc(ctx, data.size, TEE_SHM_MAPPED | TEE_SHM_DMA_BUF);
-	if (IS_ERR(shm))
+	if (IS_ERR(shm)) {
+		// printk(KERN_EMERG "WTF? error\n");
 		return PTR_ERR(shm);
+	}
+	// printk(KERN_EMERG "haha! no shm error\n");
 
 	data.id = shm->id;
 	data.flags = shm->flags;
@@ -176,6 +179,7 @@ tee_ioctl_shm_register(struct tee_context *ctx,
 	struct tee_ioctl_shm_register_data data;
 	struct tee_shm *shm;
 
+	// printk(KERN_EMERG "RL: tee_ioctl_shm_register\n");
 	if (copy_from_user(&data, udata, sizeof(data)))
 		return -EFAULT;
 
@@ -185,8 +189,10 @@ tee_ioctl_shm_register(struct tee_context *ctx,
 
 	shm = tee_shm_register(ctx, data.addr, data.length,
 			       TEE_SHM_DMA_BUF | TEE_SHM_USER_MAPPED);
-	if (IS_ERR(shm))
+	if (IS_ERR(shm)){
+		// printk(KERN_EMERG "RL: tee_shm_register error\n");
 		return PTR_ERR(shm);
+	}
 
 	data.id = shm->id;
 	data.flags = shm->flags;

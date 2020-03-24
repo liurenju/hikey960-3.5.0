@@ -10,6 +10,7 @@ uint8_t SECDEEP_KEY[] = {0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
 // But instead, we implement AES using CTR mode for format-preserving encryption.
 
 int init_FPE_state(symmetric_CTR *ctr) {
+  // DMSG("RL: initialized");
   int cipher_idx = find_cipher("aes");
 
 	if (cipher_idx < 0) {
@@ -34,18 +35,21 @@ int init_FPE_state(symmetric_CTR *ctr) {
   return TEE_SUCCESS;
 }
 
-void FPE_encrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int inlen)
+void FPE_encrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int inlen, symmetric_CTR *ctr)
 {
-  symmetric_CTR ctr;
   memset(ciphered, 0, inlen);
-  if (init_FPE_state(&ctr) != TEE_SUCCESS) {
-    panic("---RL: init aes ctr failed.");
-    return;
-  }
 
-  if(ctr_encrypt(plaintext, ciphered, inlen, &ctr) != CRYPT_OK) {
+  // if (init_FPE_state(ctr) != TEE_SUCCESS) {
+  //   panic("---RL: init aes ctr failed.");
+  //   return;
+  // }
+
+  if(ctr_encrypt(plaintext, ciphered, inlen, ctr) != CRYPT_OK) {
     panic("---RL: encrypt aes ctr failed.");
   }
+
+
+
   // DMSG("RL: Plaintext - %u, ciphered - %u\n", ((uint32_t *)plaintext)[0], ((uint32_t *)ciphered)[0]);
   // EMSG("RL: I am here!3");
 
@@ -75,17 +79,18 @@ void FPE_encrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int
 
 }
 
-void FPE_decrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int inlen)
+void FPE_decrypt(unsigned char *plaintext, unsigned char *ciphered, unsigned int inlen, symmetric_CTR *ctr)
 {
-  symmetric_CTR ctr;
   memset(plaintext, 0, inlen);
-  if (init_FPE_state(&ctr) != TEE_SUCCESS) {
-    panic("---RL: init aes ctr failed.");
-    return;
-  }
+  // if(initialize) {
+  //   if (init_FPE_state(ctr) != TEE_SUCCESS) {
+  //     panic("---RL: init aes ctr failed.");
+  //     return;
+  //   }
+  // }
 
-  if(ctr_decrypt(ciphered, plaintext, inlen, &ctr) != CRYPT_OK) {
-    panic("---RL: encrypt aes ctr failed.");
+  if(ctr_decrypt(ciphered, plaintext, inlen, ctr) != CRYPT_OK) {
+    panic("---RL: decrypt aes ctr failed.");
   }
 
   //
