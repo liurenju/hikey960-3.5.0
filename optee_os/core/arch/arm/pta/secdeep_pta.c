@@ -201,7 +201,10 @@ static TEE_Result invoke_command(void *sess_ctx __unused, uint32_t cmd_id,
       return TEE_ERROR_BAD_PARAMETERS;
     }
 
-		model_integrity(temp_buf, params[0].memref.size);
+		if(model_integrity(temp_buf, params[0].memref.size) != TEE_SUCCESS)
+		{
+			EMSG("model hello error!");
+		}
 		free(temp_buf);
 		return TEE_SUCCESS;
 	}
