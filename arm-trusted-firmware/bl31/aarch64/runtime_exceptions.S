@@ -394,22 +394,17 @@ smc_handler64:
 	 * Note: x4 only needs to be preserved for AArch32 callers but we do it
 	 *       for AArch64 callers as well for convenience
 	 */
-	//////////////////////////// YMH_START
-	//
+
+  /* Borrowed from Ginseng! Credits to them! */
 	stp	x0, x1, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X0]
 	stp	x2, x3, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X2]
-	//
-	//////////////////////////// YMH_END
+
 	stp	x4, x5, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X4]
 	stp	x6, x7, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X6]
 
 	/* Save rest of the gpregs and sp_el0*/
 	save_x18_to_x29_sp_el0
 
-	//////////////////////////// YMH_START
-	//
-	// x0-x5 contain params (6)
-	// x6, x7 are temp
 	mrs x7, esr_el3
 
 	lsr	x6, x7, #25	// exception class (EC) | IL
@@ -468,6 +463,7 @@ smc_handler64:
 	disalbeAFault		// <-- clobber: X0
 	ldr x0, [x6, #CTX_GPREGS_OFFSET + CTX_GPREG_X0]
 
+/* End of borrowed code */
 
 	bl code_integrity_request	// <-- return void
 	enableAFault		// <-- clobber: X0, but don't need to restore here because el3_exit will do
@@ -476,6 +472,8 @@ smc_handler64:
 99:
 	mov	x5, xzr
 	mov	x6, sp
+
+
 
 #if SMCCC_MAJOR_VERSION == 1
 
