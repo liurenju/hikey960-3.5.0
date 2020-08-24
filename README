@@ -1,0 +1,16 @@
+WARNING:
+If you are going to compile this repo, please make sure you follow the instructions on OP-TEE to install all of the necessary prerequite tools.
+
+
+Building instructions:
+
+If you are building this for the first time
+cd build/
+make toolchains
+
+Then
+make
+
+This repo is OPTEE for hikey960.
+
+Ref:https://github.com/OP-TEE/optee_os
